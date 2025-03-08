@@ -1,0 +1,3 @@
+type VersionResponse = {
+  version: string;
+};

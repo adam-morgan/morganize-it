@@ -19,14 +19,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@fontsource": path.resolve(__dirname, "node_modules/@fontsource"),
     },
   },
   server: {
     proxy: {
-      "/api/v1": {
+      "/api": {
         target: "http://localhost:9001/",
         changeOrigin: true,
-        // rewrite: (path) => path.replace(/^\/api\/v1/, ""),
       },
     },
     port: 9000,
@@ -37,6 +37,16 @@ export default defineConfig({
     sourcemap: true,
     manifest: true,
     rollupOptions: {
+      external: [
+        "better-sqlite3",
+        "mysql",
+        "mysql2",
+        "orabledb",
+        "pg",
+        "pq-query-stream",
+        "sqlite3",
+        "tedious",
+      ],
       output: {
         manualChunks: {
           react: ["react", "react-dom"],

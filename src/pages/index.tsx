@@ -1,28 +1,15 @@
-import { useState, JSX } from "react";
-import styles from "./index.module.css";
-import { commonExample } from "@/utils/utils.ts";
+import { BasePage } from "@/components";
+import { MainApp } from "@/features/app";
+import WithAuth from "@/features/auth/WithAuth";
 
-const HomePage = (): JSX.Element => {
-  const urlWithProxy = `api/v1/version`;
-  const [data, setData] = useState<RespExampleType | null>(null);
-
-  commonExample();
-
-  async function getDataFromServer(): Promise<void> {
-    const res = await fetch(urlWithProxy);
-    const data: RespExampleType = await res.json();
-    setData(data);
-  }
-
+const MainPage = () => {
   return (
-    <div className={styles.app}>
-      <img src="/images/nasa-logo.svg" alt="nasa logo" />
-      <button className={styles.button} onClick={getDataFromServer}>
-        Access server using proxy
-      </button>
-      <p>data : {data?.version}</p>
-    </div>
+    <WithAuth>
+      <BasePage>
+        <MainApp />
+      </BasePage>
+    </WithAuth>
   );
 };
 
-export default HomePage;
+export default MainPage;

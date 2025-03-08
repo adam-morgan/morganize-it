@@ -1,27 +1,37 @@
-import packageJSON from "../../../package.json";
-import express, { Application } from "express";
 import cors from "cors";
-import { Request, Response } from "express";
+import express, { Application, Request, Response } from "express";
+import { authRoutes } from "./routes/auth";
+import packageJSON from "../../../package.json";
+import { configureSession } from "./session";
+import { handleErrors } from "./errorHandling";
 
 const app: Application = express();
+const apiRouter = express.Router();
 
 app.use(express.json({ limit: "20mb" }));
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 
+configureSession(app);
+
+app.use("/api", apiRouter);
+
+authRoutes(apiRouter);
+
 // Serve a successful response. For use with wait-on
-app.get("/api/v1/health", (req, res) => {
+apiRouter.get("/health", (req, res) => {
   res.send({ status: "ok" });
 });
 
-app.get(`/api/v1/version`, (req: Request, res: Response) => {
-  const respObj: RespExampleType = {
-    id: 1,
+apiRouter.get(`/version`, (req: Request, res: Response) => {
+  const versionResp: VersionResponse = {
     version: packageJSON.version,
-    envVal: process.env.ENV_VALUE as string, // sample server-side env value
   };
-  res.send(respObj);
+
+  res.send(versionResp);
 });
+
+handleErrors(app, apiRouter);
 
 app.use(express.static("./.local/vite/dist"));
 
