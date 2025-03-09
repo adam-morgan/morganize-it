@@ -1,4 +1,5 @@
 import * as R from "rambda";
+import { comparePasswords, hashPassword } from "./password";
 
 export interface AuthService {
   getUser(id: number, withPassword: boolean): Promise<User>;
@@ -41,13 +42,27 @@ export abstract class AbstractAuthService implements AuthService {
   }
 
   async createUser(user: Omit<User, "id">): Promise<User> {
-    const createdUser = await this._createUser(user);
+    const userToCreate = {
+      ...user,
+      password: user.password ? await hashPassword(user.password) : undefined,
+    };
+
+    const createdUser = await this._createUser(userToCreate);
 
     return R.omit(["password"], createdUser);
   }
 
   async updateUser(user: User): Promise<User> {
-    const updatedUser = await this._updateUser(user);
+    const existingUser = await this._getUser(user.id);
+
+    if (!existingUser) {
+      throw new Error("User not found");
+    }
+
+    // Don't update password here, that will be a different route
+    const userToUpdate = { ...user, password: existingUser.password };
+
+    const updatedUser = await this._updateUser(userToUpdate);
 
     return R.omit(["password"], updatedUser);
   }
@@ -58,7 +73,7 @@ export abstract class AbstractAuthService implements AuthService {
       throw new Error("User not found");
     }
 
-    if (user.password !== password) {
+    if (!comparePasswords(password, user.password as string)) {
       throw new Error("Invalid password");
     }
 
