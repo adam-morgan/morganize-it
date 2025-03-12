@@ -7,15 +7,19 @@ type AppBarProps = {
 };
 
 const AppBar = (props: AppBarProps) => {
+  const toolbar = (
+    <Toolbar>
+      {props.leftChildren}
+      <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+        {props.title}
+      </Typography>
+      {props.rightChildren}
+    </Toolbar>
+  );
+
   return (
-    <MuiAppBar position="static">
-      <Toolbar>
-        {props.leftChildren}
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {props.title}
-        </Typography>
-        {props.rightChildren}
-      </Toolbar>
+    <MuiAppBar position="relative" sx={{ transition: "225ms" }}>
+      {toolbar}
     </MuiAppBar>
   );
 };

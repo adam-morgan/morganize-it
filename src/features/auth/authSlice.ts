@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { doLogin, doLogout, loginAsGuest } from "./auth-service";
+import { getAuthService } from "./auth-service";
 import { map, Observable, take, tap } from "rxjs";
 
 type AuthSlice = {
@@ -14,20 +14,26 @@ export const useAuthSlice = create<AuthSlice>((set) => ({
   user: undefined,
   setUser: (user) => set({ user }),
   login: (email, password) =>
-    doLogin(email, password).pipe(
-      take(1),
-      tap((response) => set({ user: response.user })),
-      map(() => undefined)
-    ),
+    getAuthService()
+      .doLogin(email, password)
+      .pipe(
+        take(1),
+        tap((response) => set({ user: response.user })),
+        map(() => undefined)
+      ),
   continueAsGuest: () =>
-    loginAsGuest().pipe(
-      take(1),
-      tap((user) => set({ user })),
-      map(() => undefined)
-    ),
+    getAuthService()
+      .loginAsGuest()
+      .pipe(
+        take(1),
+        tap((user) => set({ user })),
+        map(() => undefined)
+      ),
   logout: () =>
-    doLogout().pipe(
-      take(1),
-      tap(() => set({ user: undefined }))
-    ),
+    getAuthService()
+      .doLogout()
+      .pipe(
+        take(1),
+        tap(() => set({ user: undefined }))
+      ),
 }));

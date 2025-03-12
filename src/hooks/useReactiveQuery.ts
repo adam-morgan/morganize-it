@@ -1,14 +1,6 @@
-import { useEffect, useRef } from "react";
 import { Observable, take } from "rxjs";
+import { useEffectOnMount } from "./useEffectOnMount";
 
 export const useReactiveQuery = <T>(fn: () => Observable<T>, callback: (resp: T) => void) => {
-  const ref = useRef<boolean>(false);
-
-  useEffect(() => {
-    if (!ref.current) {
-      ref.current = true;
-
-      fn().pipe(take(1)).subscribe(callback);
-    }
-  }, []);
+  useEffectOnMount(() => fn().pipe(take(1)).subscribe(callback));
 };

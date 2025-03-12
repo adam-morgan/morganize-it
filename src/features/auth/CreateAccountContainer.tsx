@@ -1,6 +1,6 @@
 import { CreateAccountCard } from "@/components";
 import { useNavigate } from "react-router";
-import { createAccount } from "./auth-service";
+import { getAuthService } from "./auth-service";
 import { StyledLoginContainer } from "./LoginContainer";
 import { tap } from "rxjs";
 
@@ -8,7 +8,9 @@ const CreateAccountContainer = () => {
   const navigate = useNavigate();
 
   const doAccountCreation = (email: string, password: string) => {
-    return createAccount(email, password).pipe(tap(() => navigate("/")));
+    return getAuthService()
+      .createAccount(email, password)
+      .pipe(tap(() => navigate("/")));
   };
 
   return (

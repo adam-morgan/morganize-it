@@ -21,7 +21,7 @@ const Avatar = ({ user, onClick }: AvatarProps) => {
   }
 
   return (
-    <MuiAvatar sx={{ bgcolor: (style) => style.palette.text.secondary }} onClick={onClick}>
+    <MuiAvatar sx={{ bgcolor: (style) => style.palette.primary.main }} onClick={onClick}>
       {letters.toUpperCase()}
     </MuiAvatar>
   );
