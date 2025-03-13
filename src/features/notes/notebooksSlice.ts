@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { useAuthSlice } from "../auth";
 import { getNotesService } from "./services";
-import { Observable, take, tap } from "rxjs";
+import { map, Observable, of, take, tap } from "rxjs";
 
 type NotebooksSlice = {
   initialized: boolean;
   notebooks: Notebook[];
-  initialize: () => void;
+  initialize: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
 };
 
@@ -15,18 +15,17 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
   notebooks: [],
   initialize: () => {
     if (get().initialized) {
-      return;
+      return of(undefined);
     }
 
     const user = useAuthSlice.getState().user;
     const notesSvc = getNotesService(user as User);
 
-    notesSvc
-      .getNotebooks()
-      .pipe(take(1))
-      .subscribe((notebooks) => {
-        set({ notebooks, initialized: true });
-      });
+    return notesSvc.getNotebooks().pipe(
+      take(1),
+      tap((notebooks) => set({ notebooks, initialized: true })),
+      map(() => undefined)
+    );
   },
   createNotebook: (name) => {
     const user = useAuthSlice.getState().user;

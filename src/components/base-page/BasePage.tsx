@@ -1,11 +1,12 @@
 import { ThemeProvider } from "@/features/theme";
-import { Box } from "@mui/material";
+import { Backdrop, Box, CircularProgress, Typography } from "@mui/material";
 
 type BasePageProps = {
   children: React.ReactNode;
+  maskText?: string;
 };
 
-const BasePage = ({ children }: BasePageProps) => {
+const BasePage = ({ children, maskText }: BasePageProps) => {
   return (
     <ThemeProvider>
       <Box
@@ -17,6 +18,15 @@ const BasePage = ({ children }: BasePageProps) => {
       >
         {children}
       </Box>
+      <Backdrop
+        sx={(theme) => ({ color: "#fff", zIndex: theme.zIndex.drawer + 1 })}
+        open={maskText != null}
+      >
+        <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
+          <CircularProgress color="inherit" />
+          <Typography>{maskText}</Typography>
+        </Box>
+      </Backdrop>
     </ThemeProvider>
   );
 };

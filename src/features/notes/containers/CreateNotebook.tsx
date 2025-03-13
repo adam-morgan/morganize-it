@@ -3,6 +3,7 @@ import { TextField } from "@mui/material";
 import { ReactNode, useState } from "react";
 import { useNotebooksSlice } from "../notebooksSlice";
 import { take } from "rxjs";
+import { useMaskSlice } from "@/features/app";
 
 type CreateNotebookButtonProps = {
   trigger: (open: () => void) => ReactNode;
@@ -10,6 +11,7 @@ type CreateNotebookButtonProps = {
 
 const CreateNotebook = ({ trigger }: CreateNotebookButtonProps) => {
   const [name, setName] = useState("");
+  const { mask } = useMaskSlice();
   const { createNotebook } = useNotebooksSlice();
 
   return (
@@ -34,7 +36,11 @@ const CreateNotebook = ({ trigger }: CreateNotebookButtonProps) => {
           label: "Create",
           disabled: !Boolean(name?.trim()),
           onClick: () => {
-            createNotebook(name).pipe(take(1)).subscribe();
+            const unmask = mask("Creating notebook...");
+            createNotebook(name).pipe(take(1)).subscribe({
+              complete: unmask,
+              error: unmask,
+            });
           },
         },
         { label: "Cancel" },

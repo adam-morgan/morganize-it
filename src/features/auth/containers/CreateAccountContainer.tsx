@@ -1,6 +1,6 @@
 import { CreateAccountCard } from "@/components";
 import { useNavigate } from "react-router";
-import { getAuthService } from "./auth-service";
+import { getAuthService } from "../services/auth-service";
 import { StyledLoginContainer } from "./LoginContainer";
 import { tap } from "rxjs";
 

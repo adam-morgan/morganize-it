@@ -3,17 +3,15 @@ import Drawer from "@/components/drawer/Drawer";
 import { useEffectOnMount } from "@/hooks/useEffectOnMount";
 import MenuIcon from "@mui/icons-material/Menu";
 import { Box, Divider, IconButton, styled } from "@mui/material";
-import { useEffect, useRef } from "react";
 import { ProfileIcon } from "../profile";
 import { useBreakpoint } from "../theme";
+import AppMenu from "./containers/AppMenu";
 import { useMainAppSlice } from "./mainAppSlice";
-import AppMenu from "./AppMenu";
 
 const MainApp = () => {
   const { initialize, initialized, drawerOpen, setDrawerOpen } = useMainAppSlice();
 
   const breakpoint = useBreakpoint();
-  const breakpointRef = useRef(breakpoint);
 
   const mobileMode = breakpoint === "xs";
 
@@ -22,14 +20,6 @@ const MainApp = () => {
   useEffectOnMount(() => {
     initialize(breakpoint);
   });
-
-  useEffect(() => {
-    if (breakpointRef.current != null && breakpointRef.current !== breakpoint) {
-      initialize(breakpoint);
-    }
-
-    breakpointRef.current = breakpoint;
-  }, [breakpoint]);
 
   if (!initialized) {
     return undefined;

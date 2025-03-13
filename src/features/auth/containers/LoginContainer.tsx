@@ -2,7 +2,7 @@ import { LoginCard } from "@/components";
 import { Stack, styled } from "@mui/material";
 import { useNavigate } from "react-router";
 import { take, tap } from "rxjs";
-import { useAuthSlice } from "./authSlice";
+import { useAuthSlice } from "../authSlice";
 
 export const StyledLoginContainer = styled(Stack)(({ theme }) => ({
   height: "calc((1 - var(--template-frame-height, 0)) * 100dvh)",

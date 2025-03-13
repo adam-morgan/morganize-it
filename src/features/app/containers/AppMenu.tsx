@@ -1,4 +1,4 @@
-import { useEffectOnMount } from "@/hooks/useEffectOnMount";
+import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import AddIcon from "@mui/icons-material/Add";
 import {
   Box,
@@ -9,14 +9,14 @@ import {
   ListItemText,
   ListSubheader,
 } from "@mui/material";
-import { CreateNotebook, useNotebooksSlice } from "../notes";
+import { CreateNotebook, useNotebooksSlice } from "../../notes";
+import { useEffectOnMount } from "@/hooks/useEffectOnMount";
 
 const AppMenu = () => {
   const { initialize, notebooks } = useNotebooksSlice();
+  const reactiveQuery = useReactiveQueryWithMask();
 
-  useEffectOnMount(() => {
-    initialize();
-  });
+  useEffectOnMount(() => reactiveQuery(initialize, "Loading...", () => {}));
 
   return (
     <>

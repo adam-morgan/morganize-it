@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { getAuthService } from "./auth-service";
+import { getAuthService } from "./services/auth-service";
 import { map, Observable, take, tap } from "rxjs";
 
 type AuthSlice = {

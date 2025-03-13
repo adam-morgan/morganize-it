@@ -1,13 +1,12 @@
-import { BasePage } from "@/components";
-import { MainApp } from "@/features/app";
-import WithAuth from "@/features/auth/WithAuth";
+import { BasePageContainer, MainApp } from "@/features/app";
+import WithAuth from "@/features/auth/containers/WithAuth";
 
 const MainPage = () => {
   return (
     <WithAuth>
-      <BasePage>
+      <BasePageContainer>
         <MainApp />
-      </BasePage>
+      </BasePageContainer>
     </WithAuth>
   );
 };
