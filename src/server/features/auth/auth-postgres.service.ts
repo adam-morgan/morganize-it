@@ -4,7 +4,7 @@ import { AbstractAuthService } from "./auth.service";
 const userColumns = ["id", "name", "email", "password"];
 
 export class PostgresAuthService extends AbstractAuthService {
-  async _getUser(id: number) {
+  async _getUser(id: string) {
     return getKnex().select(userColumns).from<User>("users").where("id", id).first();
   }
 
@@ -12,7 +12,7 @@ export class PostgresAuthService extends AbstractAuthService {
     return getKnex().select(userColumns).from<User>("users").where("email", email).first();
   }
 
-  async _createUser(user: Omit<User, "id">): Promise<User> {
+  async _createUser(user: User): Promise<User> {
     const createdUser = await getKnex()
       .insert(user)
       .into<User>("users")
@@ -32,7 +32,7 @@ export class PostgresAuthService extends AbstractAuthService {
       .from<User>("users")
       .where("id", user.id)
       .returning(userColumns)
-      .first();
+      .then((rows) => rows[0]);
 
     if (!updatedUser) {
       throw new Error("User update failed");

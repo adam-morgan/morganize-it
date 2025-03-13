@@ -2,7 +2,7 @@ import { Knex } from "knex";
 
 export const up = async (knex: Knex) => {
   await knex.schema.createTable("users", (table) => {
-    table.increments("id").primary();
+    table.string("id").primary();
     table.string("email").unique().notNullable();
     table.string("name").notNullable();
     table.string("password");

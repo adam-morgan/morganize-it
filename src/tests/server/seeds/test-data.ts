@@ -15,7 +15,7 @@ const _seedUsers = async (knex: Knex): Promise<void> => {
 
   for (let i = 1; i <= 10; i++) {
     users.push({
-      id: i,
+      id: `user${i}`,
       name: `User ${i}`,
       email: `user${i}@gmail.com`,
       password: await hashPassword(`password${i}`),
