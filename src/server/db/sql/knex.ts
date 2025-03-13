@@ -1,7 +1,7 @@
 import path from "path";
 import knex from "knex";
 
-let knexInstance: knex.Knex;
+let knexInstance: knex.Knex | undefined;
 
 export const getKnex = () => {
   if (!knexInstance) {
@@ -22,4 +22,13 @@ export const getKnex = () => {
   }
 
   return knexInstance;
+};
+
+export const destroyKnex = () => {
+  if (knexInstance) {
+    const ret = knexInstance.destroy();
+    knexInstance = undefined;
+
+    return ret;
+  }
 };

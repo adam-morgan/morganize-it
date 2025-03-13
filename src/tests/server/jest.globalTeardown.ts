@@ -1,5 +1,7 @@
+import { destroyKnex } from "../../server/db/sql/knex";
+
 const globalTeardown = async (): Promise<void> => {
-  console.log("jest globalTeardown");
+  await destroyKnex();
 };
 
 export default globalTeardown;

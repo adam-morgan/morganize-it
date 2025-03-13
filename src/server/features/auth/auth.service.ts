@@ -21,6 +21,10 @@ export abstract class AbstractAuthService implements AuthService {
   async getUser(id: number, withPassword: boolean): Promise<User> {
     const user = await this._getUser(id);
 
+    if (user == null) {
+      throw new Error(`User not found with id: ${id}`);
+    }
+
     if (!withPassword) {
       return R.omit(["password"], user);
     }
