@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { ProfileIcon } from "../profile";
 import { useBreakpoint } from "../theme";
 import { useMainAppSlice } from "./mainAppSlice";
-import DrawerList from "./DrawerList";
+import AppMenu from "./AppMenu";
 
 const MainApp = () => {
   const { initialize, initialized, drawerOpen, setDrawerOpen } = useMainAppSlice();
@@ -93,7 +93,7 @@ const MainApp = () => {
       >
         <DrawerHeader />
         <Divider />
-        <DrawerList />
+        <AppMenu />
       </Drawer>
     </>
   );

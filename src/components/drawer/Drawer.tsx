@@ -24,10 +24,7 @@ const Drawer = ({
         onClose={onClose}
         transitionDuration={225}
         sx={{
-          "& .MuiDrawer-paper": {
-            boxSizing: "border-box",
-            width,
-          },
+          "& .MuiDrawer-paper": { boxSizing: "border-box", width },
         }}
         slotProps={{
           root: {
