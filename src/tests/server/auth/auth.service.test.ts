@@ -18,7 +18,7 @@ describe("AuthService", () => {
 
   describe("#getUser", () => {
     it("getUser should throw exception if user id not found", async () => {
-      const getUserPromise = authService.getUser(-1, true);
+      const getUserPromise = authService.getUser(1, true);
 
       await expect(getUserPromise).rejects.toThrow();
     });
