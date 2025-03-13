@@ -18,6 +18,10 @@ export const getKnex = () => {
         directory: path.join(__dirname, "migrations"),
         extension: "ts",
       },
+      seeds: {
+        directory: process.env.DB_SEEDS_DIR,
+        extension: "ts",
+      },
     });
   }
 
