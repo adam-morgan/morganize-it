@@ -3,9 +3,11 @@ import session from "express-session";
 import { getDbInstanceType } from "@/server/db/type";
 import { createKnexSessionStore } from "./knex";
 
+let sessionStore: session.Store | undefined;
+
 declare module "express-session" {
   interface SessionData {
-    userId: number;
+    userId: string;
   }
 }
 
@@ -26,9 +28,19 @@ export const configureSession = (app: Application) => {
 };
 
 const _getSessionStore = (): session.Store => {
-  if (getDbInstanceType() === "POSTGRESQL") {
-    return createKnexSessionStore();
+  if (sessionStore == null) {
+    if (getDbInstanceType() === "POSTGRESQL") {
+      sessionStore = createKnexSessionStore();
+    } else {
+      throw new Error("Unsupported database type for session store");
+    }
   }
 
-  throw new Error("Unsupported database type for session store");
+  return sessionStore;
+};
+
+export const clearAllSessions = async () => {
+  if (sessionStore != null) {
+    await sessionStore.clear?.();
+  }
 };

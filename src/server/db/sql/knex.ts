@@ -28,8 +28,8 @@ export const getKnex = () => {
   return knexInstance;
 };
 
-export const destroyKnex = () => {
-  if (knexInstance) {
+export const destroyKnex = async () => {
+  if (knexInstance != null) {
     const ret = knexInstance.destroy();
     knexInstance = undefined;
 
