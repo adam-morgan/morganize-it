@@ -1,5 +1,5 @@
 import { Application } from "express";
-import session from "express-session";
+import session, { MemoryStore } from "express-session";
 import { getDbInstanceType } from "@/server/db/type";
 import { createKnexSessionStore } from "./knex";
 
@@ -29,7 +29,9 @@ export const configureSession = (app: Application) => {
 
 const _getSessionStore = (): session.Store => {
   if (sessionStore == null) {
-    if (getDbInstanceType() === "POSTGRESQL") {
+    if (process.env.NODE_ENV === "test") {
+      sessionStore = new MemoryStore();
+    } else if (getDbInstanceType() === "POSTGRESQL") {
       sessionStore = createKnexSessionStore();
     } else {
       throw new Error("Unsupported database type for session store");
