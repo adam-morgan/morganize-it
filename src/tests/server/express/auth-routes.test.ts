@@ -71,12 +71,12 @@ describe("Express - Auth Routes", () => {
       expect(response.status).toBe(400);
     });
 
-    it("should return 200 if account created", async () => {
+    it("should return 201 if account created", async () => {
       const response = await request(app)
         .post("/api/auth/create-account")
         .send({ email: "new-account@gmail.com", password: "password123" });
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(201);
       expect(response.body.user).toBeDefined();
       expect(response.body.user.email).toBe("new-account@gmail.com");
       expect(response.body.user.password).toBeUndefined();

@@ -7,7 +7,7 @@ export const seed = async (knex: Knex): Promise<void> => {
 };
 
 const _truncate = async (knex: Knex): Promise<void> => {
-  await knex("users").truncate();
+  await knex("users").delete();
 };
 
 const _seedUsers = async (knex: Knex): Promise<void> => {
