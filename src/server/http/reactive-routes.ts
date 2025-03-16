@@ -1,10 +1,10 @@
-import { ReactiveService, TableID } from "@/server/db/reactive-service";
+import { ReactiveService } from "@/server/db/reactive-service";
 import { HttpRequest } from "./request";
 import { catchError, map, Observable, of } from "rxjs";
 import { HttpResponse } from "./response";
 
-export class ReactiveRoutes<T, ID extends TableID> {
-  constructor(private svc: ReactiveService<T, ID>) {}
+export class ReactiveRoutes<T> {
+  constructor(private svc: ReactiveService<T>) {}
 
   public create(req: HttpRequest<T>): Observable<HttpResponse<T | ApiError>> {
     return this.svc.create(req.body).pipe(

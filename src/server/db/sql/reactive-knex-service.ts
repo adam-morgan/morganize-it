@@ -1,9 +1,9 @@
-import { from, map, Observable } from "rxjs";
+import { from, Observable, of, switchMap, throwError } from "rxjs";
 import { AbstractReactiveService, TableID } from "../reactive-service";
 import { getKnex } from "./knex";
 import { buildQuery } from "./query-builder";
 
-export class ReactiveKnexService<T, ID extends TableID> extends AbstractReactiveService<T, ID> {
+export class ReactiveKnexService<T> extends AbstractReactiveService<T> {
   constructor(
     private table: string,
     private columns: string[],
@@ -27,7 +27,7 @@ export class ReactiveKnexService<T, ID extends TableID> extends AbstractReactive
     );
   }
 
-  update(id: ID, data: T): Observable<T> {
+  update(id: TableID, data: T): Observable<T> {
     return from(
       getKnex()
         .update(data)
@@ -35,15 +35,23 @@ export class ReactiveKnexService<T, ID extends TableID> extends AbstractReactive
         .where({ [this.idProperty]: id })
         .returning(this.columns)
         .then((rows) => rows[0] as T)
+    ).pipe(
+      switchMap((response) =>
+        response == null ? throwError(() => new Error("Record not found")) : of(response)
+      )
     );
   }
 
-  delete(id: ID): Observable<void> {
+  delete(id: TableID): Observable<void> {
     return from(
       getKnex()
         .delete()
         .from(this.table)
         .where({ [this.idProperty]: id })
-    ).pipe(map(() => undefined));
+    ).pipe(
+      switchMap((count) =>
+        count === 0 ? throwError(() => new Error("Record not found")) : of(undefined)
+      )
+    );
   }
 }
