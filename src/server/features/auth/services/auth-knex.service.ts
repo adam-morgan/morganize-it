@@ -3,7 +3,7 @@ import { AbstractAuthService } from "./auth.service";
 
 const userColumns = ["id", "name", "email", "password"];
 
-export class PostgresAuthService extends AbstractAuthService {
+export class AuthKnexService extends AbstractAuthService {
   async _getUser(id: string) {
     return getKnex().select(userColumns).from<User>("users").where("id", id).first();
   }

@@ -51,5 +51,5 @@ export const createAccount = async (
   };
 
   const createdUser = await authService.createUser(user);
-  return { status: 200, body: { user: createdUser } };
+  return { status: 201, body: { user: createdUser } };
 };

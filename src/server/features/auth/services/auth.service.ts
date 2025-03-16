@@ -1,6 +1,6 @@
 import * as R from "rambda";
 import { v4 as uuid } from "uuid";
-import { comparePasswords, hashPassword } from "./password";
+import { comparePasswords, hashPassword } from "../password";
 
 export interface AuthService {
   getUser(id: string, withPassword: boolean): Promise<User>;
