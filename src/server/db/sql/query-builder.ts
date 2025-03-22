@@ -46,8 +46,7 @@ export const buildQuery = (table: string, findOptions?: FindOptions) => {
               case "$nin":
                 query.whereNotIn(property, operatorValue as FilterValue[]);
                 break;
-              case "$regex":
-                // TODO: Implement regex
+              case "$like":
                 query.where(property, "like", operatorValue);
                 break;
               default:

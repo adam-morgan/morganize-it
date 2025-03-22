@@ -1,6 +1,7 @@
 import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import { authRoutes } from "./routes/auth";
+import { notebookRoutes } from "./routes/notebook";
 import packageJSON from "../../../package.json";
 import { configureSession } from "./session";
 import { handleErrors } from "./errorHandling";
@@ -17,6 +18,7 @@ configureSession(app);
 app.use("/api", apiRouter);
 
 authRoutes(apiRouter);
+notebookRoutes(apiRouter);
 
 // Serve a successful response. For use with wait-on
 apiRouter.get("/health", (req, res) => {

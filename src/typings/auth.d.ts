@@ -1,5 +1,4 @@
-interface User {
-  id: string;
+interface User extends Entity {
   name: string;
   email: string;
   password?: string;

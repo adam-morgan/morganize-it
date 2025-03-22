@@ -36,7 +36,7 @@ type FilterOperator = {
   $ne?: FilterLiteral;
   $in?: FilterLiteral[];
   $nin?: FilterLiteral[];
-  $regex?: string;
+  $like?: string;
 };
 
 type Sort = {

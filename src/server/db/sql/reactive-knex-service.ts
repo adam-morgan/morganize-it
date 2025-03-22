@@ -3,7 +3,7 @@ import { AbstractReactiveService, TableID } from "../reactive-service";
 import { getKnex } from "./knex";
 import { buildQuery } from "./query-builder";
 
-export class ReactiveKnexService<T> extends AbstractReactiveService<T> {
+export class ReactiveKnexService<T extends Entity> extends AbstractReactiveService<T> {
   constructor(
     private table: string,
     private columns: string[],
