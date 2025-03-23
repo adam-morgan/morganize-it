@@ -2,6 +2,7 @@ import { from, Observable, of, switchMap, throwError } from "rxjs";
 import { AbstractReactiveService, TableID } from "../reactive-service";
 import { getKnex } from "./knex";
 import { buildQuery } from "./query-builder";
+import { NotFoundError } from "@/server/errors";
 
 export class ReactiveKnexService<T extends Entity> extends AbstractReactiveService<T> {
   constructor(
@@ -37,7 +38,7 @@ export class ReactiveKnexService<T extends Entity> extends AbstractReactiveServi
         .then((rows) => rows[0] as T)
     ).pipe(
       switchMap((response) =>
-        response == null ? throwError(() => new Error("Record not found")) : of(response)
+        response == null ? throwError(() => new NotFoundError("Record not found")) : of(response)
       )
     );
   }
@@ -50,7 +51,7 @@ export class ReactiveKnexService<T extends Entity> extends AbstractReactiveServi
         .where({ [this.idProperty]: id })
     ).pipe(
       switchMap((count) =>
-        count === 0 ? throwError(() => new Error("Record not found")) : of(undefined)
+        count === 0 ? throwError(() => new NotFoundError("Record not found")) : of(undefined)
       )
     );
   }

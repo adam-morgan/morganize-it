@@ -1,6 +1,6 @@
 import { getNotebookService } from "@/server/features/notes";
-import { ReactiveTestDef, runGenericReactiveServiceTests } from "../../util/reactive-service-tests";
-import { runGenericReactiveRouteTests } from "../../util/reactive-route-tests";
+import { ReactiveTestDef } from "../../util/reactive-service-tests";
+import { runGenericTests } from "../../util/reactive-tests";
 
 describe("NotebookService", () => {
   const svc = getNotebookService();
@@ -10,6 +10,7 @@ describe("NotebookService", () => {
     create: { name: "Test Notebook", userId: "user1" },
     update: { name: "Test Notebook Updated", userId: "user1" },
     patch: { name: "Test Notebook Patched " },
+    routeUser: { id: "user1", email: "user1@gmail.com", password: "password1" },
     find: {
       records: [
         { id: "1", name: "Test Notebook 1", userId: "user1" },
@@ -39,17 +40,28 @@ describe("NotebookService", () => {
           recordIds: ["1"],
         },
         {
+          options: { criteria: { name: { $like: "%book 1" } } },
+          recordIds: ["1"],
+        },
+      ],
+      svcQueries: [
+        {
           options: { criteria: { userId: "user2" } },
           recordIds: ["3"],
         },
+      ],
+      routeQueries: [
         {
-          options: { criteria: { name: { $like: "%book 1" } } },
-          recordIds: ["1"],
+          options: {},
+          recordIds: ["1", "2"],
+        },
+        {
+          options: { criteria: { userId: "user2" } },
+          recordIds: [],
         },
       ],
     },
   };
 
-  runGenericReactiveServiceTests(testDef);
-  runGenericReactiveRouteTests("/api/notebooks", testDef);
+  runGenericTests("/api/notebooks", testDef);
 });

@@ -7,9 +7,24 @@ export type ReactiveTestDef<T extends Entity> = {
   create: Omit<T, "id">;
   update: Omit<T, "id">;
   patch: Partial<T>;
+  routeUser?: {
+    id: string;
+    email: string;
+    password: string;
+  };
   find: {
     records: T[];
-    queries: {
+    queries?: {
+      name?: string;
+      options: FindOptions;
+      recordIds: string[];
+    }[];
+    routeQueries?: {
+      name?: string;
+      options: FindOptions;
+      recordIds: string[];
+    }[];
+    svcQueries?: {
       name?: string;
       options: FindOptions;
       recordIds: string[];
@@ -19,31 +34,21 @@ export type ReactiveTestDef<T extends Entity> = {
 
 export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTestDef<T>) => {
   describe("#find", () => {
-    const idToGuid: Record<string, string> = {};
+    const queries = [...(def.find.queries ?? []), ...(def.find.svcQueries ?? [])];
 
-    beforeAll(async () => {
-      for (const record of def.find.records) {
-        const id = uuid();
-        idToGuid[record.id] = id;
-
-        await firstValueFrom(def.svc.create({ ...record, id }));
-      }
-    });
-
-    for (let i = 0; i < def.find.queries.length; i++) {
-      const query = def.find.queries[i];
+    for (let i = 0; i < queries.length; i++) {
+      const query = queries[i];
       const name = query.name || `Query ${i}`;
 
       it(name, async () => {
         const findResponse = await firstValueFrom(def.svc.find(query.options));
 
         const recordIds = findResponse.map((r) => r.id);
-        const queryRecordIds = query.recordIds.map((id) => idToGuid[id]);
 
         if (query.options.sort != null) {
-          expect(recordIds).toEqual(queryRecordIds);
+          expect(recordIds).toEqual(query.recordIds);
         } else {
-          expect(recordIds).toEqual(expect.arrayContaining(queryRecordIds));
+          expect(recordIds).toEqual(expect.arrayContaining(query.recordIds));
         }
       });
     }

@@ -1,6 +1,8 @@
 import { Observable, of, switchMap, throwError } from "rxjs";
+import { NotFoundError } from "../errors";
 
 export type TableID = string;
+
 export interface ReactiveService<T extends Entity> {
   find(options: FindOptions): Observable<T[]>;
   findById(id: TableID): Observable<T>;
@@ -21,7 +23,7 @@ export abstract class AbstractReactiveService<T extends Entity> implements React
   findById(id: TableID): Observable<T> {
     return this.find({ criteria: { id } }).pipe(
       switchMap((items) =>
-        items.length === 0 ? throwError(() => new Error(`Not found: ${id}`)) : of(items[0])
+        items.length === 0 ? throwError(() => new NotFoundError(`Not found: ${id}`)) : of(items[0])
       )
     );
   }

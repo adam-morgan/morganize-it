@@ -1,4 +1,3 @@
-interface Notebook extends Entity {
+interface Notebook extends UserEntity {
   name: string;
-  userId: string;
 }
