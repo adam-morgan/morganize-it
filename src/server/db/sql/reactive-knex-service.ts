@@ -6,8 +6,8 @@ import { NotFoundError } from "@/server/errors";
 
 export class ReactiveKnexService<T extends Entity> extends AbstractReactiveService<T> {
   constructor(
-    private table: string,
-    private columns: string[],
+    protected table: string,
+    protected columns: string[],
     protected idProperty: string
   ) {
     super();

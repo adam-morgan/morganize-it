@@ -1,6 +1,6 @@
-import { ReactiveKnexService } from "@/server/db/sql";
+import { UserEntityReactiveKnexService } from "@/server/db/sql/user-entity-reactive-knex-service";
 
-export class NotebookKnexService extends ReactiveKnexService<Notebook> {
+export class NotebookKnexService extends UserEntityReactiveKnexService<Notebook> {
   constructor() {
     super("notebooks", ["id", "name", "userId"], "id");
   }

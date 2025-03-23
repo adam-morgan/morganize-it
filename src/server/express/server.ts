@@ -1,11 +1,10 @@
 import dotenv from "dotenv";
-dotenv.config();
 import { createServer } from "http";
-import app from "./restApi.ts";
-import { commonExample } from "@/utils/utils.ts";
-import { initDb } from "../db/initialize.ts";
+import { initDb } from "../db/initialize";
+import { debug } from "../logging/index";
+import app from "./restApi";
 
-commonExample();
+dotenv.config();
 
 const server = createServer();
 
@@ -15,7 +14,7 @@ const init = async () => {
   await initDb();
 
   server.listen(9001, () => {
-    console.log(`API (re)started`);
+    debug(`API (re)started`);
   });
 };
 

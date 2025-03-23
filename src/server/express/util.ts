@@ -3,6 +3,7 @@ import { HttpRequest } from "../http/request";
 import { HttpHeaders } from "../http/headers";
 import { ParsedUrlQuery } from "querystring";
 import { HttpResponse } from "../http/response";
+import { error } from "../logging";
 
 export const makeHttpRequest = <T>(expressReq: Request<T>): HttpRequest<T> => {
   const headers: Record<string, string | string[]> = {};
@@ -33,7 +34,7 @@ export const handleHttpResponseAsync = <T>(
       handleHttpResponse(httpResponse, expressResponse);
     })
     .catch((e) => {
-      console.error(e);
+      error(e.message, e);
       expressResponse.status(500).json({ message: "Internal Server Error" } as T);
     });
 };

@@ -4,8 +4,8 @@ import { NotFoundError } from "../errors";
 export type TableID = string;
 
 export interface ReactiveService<T extends Entity> {
-  find(options: FindOptions): Observable<T[]>;
-  findById(id: TableID): Observable<T>;
+  find(options: FindOptions, userId?: string): Observable<T[]>;
+  findById(id: TableID, userId?: string): Observable<T>;
   create(data: Omit<T, "id">): Observable<T>;
   update(id: TableID, data: T): Observable<T>;
   patch(id: TableID, data: Partial<T>): Observable<T>;
@@ -15,13 +15,13 @@ export interface ReactiveService<T extends Entity> {
 export abstract class AbstractReactiveService<T extends Entity> implements ReactiveService<T> {
   protected idProperty = "id";
 
-  abstract find(options: FindOptions): Observable<T[]>;
+  abstract find(options: FindOptions, userId?: string): Observable<T[]>;
   abstract create(data: T): Observable<T>;
   abstract update(id: TableID, data: T): Observable<T>;
   abstract delete(id: TableID): Observable<void>;
 
-  findById(id: TableID): Observable<T> {
-    return this.find({ criteria: { id } }).pipe(
+  findById(id: TableID, userId?: string): Observable<T> {
+    return this.find({ criteria: { id } }, userId).pipe(
       switchMap((items) =>
         items.length === 0 ? throwError(() => new NotFoundError(`Not found: ${id}`)) : of(items[0])
       )

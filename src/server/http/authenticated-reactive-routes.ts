@@ -18,25 +18,7 @@ export class AuthenticatedReactiveRoutes<T extends Entity> extends ReactiveRoute
       return of({ status: 401, body: { message: "Unauthorized" } });
     }
 
-    return super.findById(req).pipe(
-      switchMap((response) => {
-        if (response.status !== 200) {
-          return of(response);
-        }
-
-        return (
-          this.permissionResolver?.canRead(req.userId as string, response.body as T) ?? of(true)
-        ).pipe(
-          switchMap((canRead) => {
-            if (!canRead) {
-              return of({ status: 403, body: { message: "Forbidden" } });
-            }
-
-            return of(response);
-          })
-        );
-      })
-    );
+    return super.findById(req);
   }
 
   public override create(req: HttpRequest<T>): Observable<HttpResponse<T | ApiError>> {

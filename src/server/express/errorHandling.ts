@@ -1,8 +1,9 @@
 import { Application, NextFunction, Request, Response, Router } from "express";
+import { error } from "../logging";
 
 export const handleErrors = (app: Application, router: Router) => {
   app.use((err: Error, _req: Request, res: Response, _next: Function) => {
-    console.error(err);
+    error(err.message, err);
     res.status(500).json({ message: "Internal Server Error" });
   });
 

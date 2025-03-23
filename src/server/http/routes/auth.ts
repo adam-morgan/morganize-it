@@ -1,6 +1,7 @@
 import { getAuthService } from "@/server/features";
 import { HttpRequest } from "../request";
 import { HttpResponse } from "../response";
+import { error } from "@/server/logging";
 
 export const whoami = async (
   req: HttpRequest<void>
@@ -10,7 +11,7 @@ export const whoami = async (
       const user = await getAuthService().getUser(req.userId, false);
       return { status: 200, body: user };
     } catch (e) {
-      console.error(e);
+      error((e as Error).message, e as Error);
       return { status: 500, body: { message: "Internal Server Error" } };
     }
   } else {
@@ -24,8 +25,8 @@ export const login = async (
   try {
     const response = await getAuthService().login(req.body.email, req.body.password);
     return { status: 200, body: response };
-  } catch (error) {
-    console.error(error);
+  } catch (e) {
+    error((e as Error).message, e as Error);
     return { status: 401, body: { message: "Invalid email or password" } };
   }
 };

@@ -6,10 +6,6 @@ import { PermissionResolver } from "./permission-resolver";
 export class UserEntityPermissionResolver<T extends UserEntity> implements PermissionResolver<T> {
   constructor(private reactiveService: ReactiveService<T>) {}
 
-  canRead(userId: string, entity: T): Observable<boolean> {
-    return of(entity.userId === userId);
-  }
-
   canCreate(userId: string, entity: T): Observable<boolean> {
     return of(entity.userId === userId);
   }

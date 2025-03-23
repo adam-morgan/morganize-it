@@ -8,7 +8,7 @@ export class ReactiveRoutes<T extends Entity> {
   constructor(private svc: ReactiveService<T>) {}
 
   public findById(req: HttpRequest<T>): Observable<HttpResponse<T | ApiError>> {
-    return this.svc.findById(req.params.id).pipe(
+    return this.svc.findById(req.params.id, req.userId).pipe(
       map((foundObj) => ({ status: 200, body: foundObj })),
       catchError((e) =>
         of({

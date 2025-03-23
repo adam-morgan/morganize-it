@@ -1,9 +1,17 @@
 import { Knex } from "knex";
 import { getKnex } from "./knex";
 
-export const buildQuery = (table: string, findOptions?: FindOptions) => {
+export const buildQuery = (
+  table: string,
+  findOptions?: FindOptions,
+  queryFn?: (query: Knex.QueryBuilder) => void
+) => {
   const knex = getKnex();
   const query: Knex.QueryBuilder = knex(table);
+
+  if (queryFn) {
+    queryFn(query);
+  }
 
   const applyCriteria = (query: Knex.QueryBuilder, criteria: Criteria) => {
     if ((criteria as AndCriteria).$and) {

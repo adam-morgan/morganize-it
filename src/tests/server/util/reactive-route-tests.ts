@@ -1,6 +1,8 @@
-import request from "supertest";
-import * as R from "rambda";
 import app from "@/server/express/restApi";
+import * as R from "rambda";
+import { firstValueFrom } from "rxjs";
+import request from "supertest";
+import { v4 as uuid } from "uuid";
 import { ReactiveTestDef } from "./reactive-service-tests";
 
 export const runGenericReactiveRouteTests = <T extends Entity>(
@@ -20,6 +22,18 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
       expect(response.status).toBe(404);
     });
+
+    if (isUserEntity) {
+      it("should fail when not permitted to access", async () => {
+        const createdObj = await firstValueFrom(
+          def.svc.create({ ...def.create, id: uuid(), userId: "user10" })
+        );
+
+        const response = await agent.get(`${routePrefix}/${createdObj.id}`);
+
+        expect(response.status).toBe(404);
+      });
+    }
 
     it("should return record", async () => {
       const createResponse = await agent.post(routePrefix).send(def.create);
