@@ -7,6 +7,38 @@ import { HttpResponse } from "./response";
 export class ReactiveRoutes<T extends Entity> {
   constructor(private svc: ReactiveService<T>) {}
 
+  public find(req: HttpRequest<FindOptions>): Observable<HttpResponse<T[] | ApiError>> {
+    let findOptions: FindOptions = {
+      ...(req.body ?? {}),
+    };
+
+    if (req.query.criteria != null) {
+      findOptions.criteria = JSON.parse(req.query.criteria as string);
+    }
+
+    if (req.query.sort != null) {
+      findOptions.sort = JSON.parse(req.query.sort as string);
+    }
+
+    if (req.query.limit != null) {
+      findOptions.limit = parseInt(req.query.limit as string, 10);
+    }
+
+    if (req.query.offset != null) {
+      findOptions.offset = parseInt(req.query.offset as string, 10);
+    }
+
+    return this.svc.find(findOptions, req.userId).pipe(
+      map((foundObjs) => ({ status: 200, body: foundObjs })),
+      catchError((e) =>
+        of({
+          status: e.code && typeof e.code === "number" && e.code <= 511 ? e.code : 500,
+          body: { message: e.message },
+        })
+      )
+    );
+  }
+
   public findById(req: HttpRequest<T>): Observable<HttpResponse<T | ApiError>> {
     return this.svc.findById(req.params.id, req.userId).pipe(
       map((foundObj) => ({ status: 200, body: foundObj })),

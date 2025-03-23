@@ -1,7 +1,7 @@
 import app from "@/server/express/restApi";
 import * as R from "rambda";
 import { firstValueFrom } from "rxjs";
-import request from "supertest";
+import request, { Response } from "supertest";
 import { v4 as uuid } from "uuid";
 import { ReactiveTestDef } from "./reactive-service-tests";
 
@@ -11,9 +11,69 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
   isUserEntity = true
 ) => {
   const agent = request.agent(app);
+  const readAgent = request.agent(app);
 
   beforeAll(async () => {
-    await agent.post("/api/auth/login").send({ email: "user1@gmail.com", password: "password1" });
+    if (def.writeRouteUser != null) {
+      await agent
+        .post("/api/auth/login")
+        .send({ email: def.writeRouteUser.email, password: def.writeRouteUser?.password });
+    }
+
+    if (def.readRouteUser != null) {
+      await readAgent
+        .post("/api/auth/login")
+        .send({ email: "user1@gmail.com", password: "password1" });
+    }
+  });
+
+  const queries = [...(def.find.queries ?? []), ...(def.find.routeQueries ?? [])];
+
+  const testQueries = (queryFunc: (query: (typeof queries)[0]) => Promise<Response>) => {
+    for (let i = 0; i < queries.length; i++) {
+      const query = queries[i];
+      const name = query.name || `Query ${i}`;
+
+      it(name, async () => {
+        const findResponse = await queryFunc(query);
+
+        expect(findResponse.status).toBe(200);
+
+        const records: T[] = findResponse.body as unknown as T[];
+        const recordIds = records.map((r) => r.id);
+
+        if (query.options.sort != null) {
+          expect(recordIds).toEqual(query.recordIds);
+        } else {
+          expect(recordIds).toEqual(expect.arrayContaining(query.recordIds));
+        }
+      });
+    }
+  };
+
+  describe(`GET ${routePrefix}`, () => {
+    testQueries(async (query) => {
+      let req = readAgent.get(routePrefix);
+
+      for (const key in query.options) {
+        if (key === "limit" || key === "offset") {
+          req = req.query({ [key]: (query.options as any)[key] });
+        } else {
+          req = req.query({ [key]: JSON.stringify((query.options as any)[key]) });
+        }
+      }
+
+      const response = await req;
+      return response;
+    });
+  });
+
+  describe(`POST ${routePrefix}/find`, () => {
+    testQueries(async (query) => {
+      const response = await readAgent.post(`${routePrefix}/find`).send(query.options);
+
+      return response;
+    });
   });
 
   describe(`GET ${routePrefix}/:id`, () => {

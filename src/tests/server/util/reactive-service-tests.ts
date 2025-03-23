@@ -7,7 +7,12 @@ export type ReactiveTestDef<T extends Entity> = {
   create: Omit<T, "id">;
   update: Omit<T, "id">;
   patch: Partial<T>;
-  routeUser?: {
+  writeRouteUser?: {
+    id: string;
+    email: string;
+    password: string;
+  };
+  readRouteUser?: {
     id: string;
     email: string;
     password: string;

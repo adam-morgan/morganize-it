@@ -8,6 +8,20 @@ export const createReactiveServiceRoutes = <T extends Entity>(
   routePrefix: string,
   reactiveRoutes: ReactiveRoutes<T>
 ) => {
+  router.get(`${routePrefix}`, (req: Request<FindOptions>, res: Response<T[] | ApiError>) => {
+    reactiveRoutes
+      .find(makeHttpRequest(req))
+      .pipe(take(1))
+      .subscribe((response) => handleHttpResponse(response, res));
+  });
+
+  router.post(`${routePrefix}/find`, (req: Request<FindOptions>, res: Response<T[] | ApiError>) => {
+    reactiveRoutes
+      .find(makeHttpRequest(req))
+      .pipe(take(1))
+      .subscribe((response) => handleHttpResponse(response, res));
+  });
+
   router.get(`${routePrefix}/:id`, (req: Request<T>, res: Response<T | ApiError>) => {
     reactiveRoutes
       .findById(makeHttpRequest(req))

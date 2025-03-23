@@ -7,10 +7,11 @@ describe("NotebookService", () => {
 
   const testDef: ReactiveTestDef<Notebook> = {
     svc,
-    create: { name: "Test Notebook", userId: "user1" },
-    update: { name: "Test Notebook Updated", userId: "user1" },
+    create: { name: "Test Notebook", userId: "user5" },
+    update: { name: "Test Notebook Updated", userId: "user5" },
     patch: { name: "Test Notebook Patched " },
-    routeUser: { id: "user1", email: "user1@gmail.com", password: "password1" },
+    writeRouteUser: { id: "user5", email: "user5@gmail.com", password: "password5" },
+    readRouteUser: { id: "user1", email: "user1@gmail.com", password: "password1" },
     find: {
       records: [
         { id: "1", name: "Test Notebook 1", userId: "user1" },
