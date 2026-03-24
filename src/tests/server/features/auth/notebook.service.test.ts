@@ -32,13 +32,13 @@ describe("NotebookService", () => {
           recordIds: ["1"],
         },
         {
+          name: "Sort desc with limit",
           options: {
             criteria: { userId: "user1" },
             sort: [{ property: "name", direction: "desc" }],
             limit: 1,
-            offset: 1,
           },
-          recordIds: ["1"],
+          recordIds: ["2"],
         },
         {
           options: { criteria: { name: { $like: "%book 1" } } },

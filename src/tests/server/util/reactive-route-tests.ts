@@ -5,25 +5,41 @@ import request, { Response } from "supertest";
 import { v4 as uuid } from "uuid";
 import { ReactiveTestDef } from "./reactive-service-tests";
 
+const loginForToken = async (email: string, password: string): Promise<string> => {
+  const response = await request(app).post("/api/auth/login").send({ email, password });
+  return response.body.token;
+};
+
+const authGet = (token: string, url: string) =>
+  request(app).get(url).set("Authorization", `Bearer ${token}`);
+
+const authPost = (token: string, url: string) =>
+  request(app).post(url).set("Authorization", `Bearer ${token}`);
+
+const authPut = (token: string, url: string) =>
+  request(app).put(url).set("Authorization", `Bearer ${token}`);
+
+const authPatch = (token: string, url: string) =>
+  request(app).patch(url).set("Authorization", `Bearer ${token}`);
+
+const authDelete = (token: string, url: string) =>
+  request(app).delete(url).set("Authorization", `Bearer ${token}`);
+
 export const runGenericReactiveRouteTests = <T extends Entity>(
   routePrefix: string,
   def: ReactiveTestDef<T>,
   isUserEntity = true
 ) => {
-  const agent = request.agent(app);
-  const readAgent = request.agent(app);
+  let writeToken: string;
+  let readToken: string;
 
   beforeAll(async () => {
     if (def.writeRouteUser != null) {
-      await agent
-        .post("/api/auth/login")
-        .send({ email: def.writeRouteUser.email, password: def.writeRouteUser?.password });
+      writeToken = await loginForToken(def.writeRouteUser.email, def.writeRouteUser.password!);
     }
 
     if (def.readRouteUser != null) {
-      await readAgent
-        .post("/api/auth/login")
-        .send({ email: "user1@gmail.com", password: "password1" });
+      readToken = await loginForToken("user1@gmail.com", "password1");
     }
   });
 
@@ -39,8 +55,8 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
         expect(findResponse.status).toBe(200);
 
-        const records: T[] = findResponse.body as unknown as T[];
-        const recordIds = records.map((r) => r.id);
+        const result: PageResult<T> = findResponse.body as unknown as PageResult<T>;
+        const recordIds = result.items.map((r) => r.id);
 
         if (query.options.sort != null) {
           expect(recordIds).toEqual(query.recordIds);
@@ -53,10 +69,10 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`GET ${routePrefix}`, () => {
     testQueries(async (query) => {
-      let req = readAgent.get(routePrefix);
+      let req = authGet(readToken, routePrefix);
 
       for (const key in query.options) {
-        if (key === "limit" || key === "offset") {
+        if (key === "limit" || key === "cursor") {
           req = req.query({ [key]: (query.options as any)[key] });
         } else {
           req = req.query({ [key]: JSON.stringify((query.options as any)[key]) });
@@ -70,7 +86,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`POST ${routePrefix}/find`, () => {
     testQueries(async (query) => {
-      const response = await readAgent.post(`${routePrefix}/find`).send(query.options);
+      const response = await authPost(readToken, `${routePrefix}/find`).send(query.options);
 
       return response;
     });
@@ -78,7 +94,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`GET ${routePrefix}/:id`, () => {
     it("should fail with invalid id", async () => {
-      const response = await agent.get(`${routePrefix}/invalid-id`);
+      const response = await authGet(writeToken, `${routePrefix}/invalid-id`);
 
       expect(response.status).toBe(404);
     });
@@ -89,17 +105,17 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
           def.svc.create({ ...def.create, id: uuid(), userId: "user10" })
         );
 
-        const response = await agent.get(`${routePrefix}/${createdObj.id}`);
+        const response = await authGet(writeToken, `${routePrefix}/${createdObj.id}`);
 
         expect(response.status).toBe(404);
       });
     }
 
     it("should return record", async () => {
-      const createResponse = await agent.post(routePrefix).send(def.create);
+      const createResponse = await authPost(writeToken, routePrefix).send(def.create);
       const createdObj = createResponse.body;
 
-      const response = await agent.get(`${routePrefix}/${createdObj.id}`);
+      const response = await authGet(writeToken, `${routePrefix}/${createdObj.id}`);
 
       expect(response.status).toBe(200);
       expect(R.omit(["id"], response.body)).toEqual(def.create);
@@ -109,16 +125,17 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
   describe(`POST ${routePrefix}`, () => {
     if (isUserEntity) {
       it("should fail with invalid user id", async () => {
-        const response = await agent
-          .post(routePrefix)
-          .send({ ...def.create, userId: "invalid-user-id" });
+        const response = await authPost(writeToken, routePrefix).send({
+          ...def.create,
+          userId: "invalid-user-id",
+        });
 
         expect(response.status).toBe(403);
       });
     }
 
     it("should create", async () => {
-      const response = await agent.post(routePrefix).send(def.create);
+      const response = await authPost(writeToken, routePrefix).send(def.create);
 
       expect(response.status).toBe(201);
       expect(R.omit(["id"], response.body)).toEqual(def.create);
@@ -127,16 +144,18 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`PUT ${routePrefix}/:id`, () => {
     it("should fail with invalid id", async () => {
-      const response = await agent.put(`${routePrefix}/invalid-id`).send(def.update);
+      const response = await authPut(writeToken, `${routePrefix}/invalid-id`).send(def.update);
 
       expect(response.status).toBe(404);
     });
 
     it("should update", async () => {
-      const createResponse = await agent.post(routePrefix).send(def.create);
+      const createResponse = await authPost(writeToken, routePrefix).send(def.create);
       const createdObj = createResponse.body;
 
-      const response = await agent.put(`${routePrefix}/${createdObj.id}`).send(def.update);
+      const response = await authPut(writeToken, `${routePrefix}/${createdObj.id}`).send(
+        def.update
+      );
 
       expect(response.status).toBe(200);
       expect(R.omit(["id"], response.body)).toEqual(def.update);
@@ -145,16 +164,18 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`PATCH ${routePrefix}/:id`, () => {
     it("should fail with invalid id", async () => {
-      const response = await agent.patch(`${routePrefix}/invalid-id`).send(def.patch);
+      const response = await authPatch(writeToken, `${routePrefix}/invalid-id`).send(def.patch);
 
       expect(response.status).toBe(404);
     });
 
     it("should patch", async () => {
-      const createResponse = await agent.post(routePrefix).send(def.create);
+      const createResponse = await authPost(writeToken, routePrefix).send(def.create);
       const createdObj = createResponse.body;
 
-      const response = await agent.patch(`${routePrefix}/${createdObj.id}`).send(def.patch);
+      const response = await authPatch(writeToken, `${routePrefix}/${createdObj.id}`).send(
+        def.patch
+      );
 
       expect(response.status).toBe(200);
       expect(R.omit(["id"], response.body)).toEqual({ ...def.create, ...def.patch });
@@ -163,16 +184,16 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
 
   describe(`DELETE ${routePrefix}/:id`, () => {
     it("should fail with invalid id", async () => {
-      const response = await agent.delete(`${routePrefix}/invalid-id`);
+      const response = await authDelete(writeToken, `${routePrefix}/invalid-id`);
 
       expect(response.status).toBe(404);
     });
 
     it("should delete", async () => {
-      const createResponse = await agent.post(routePrefix).send(def.create);
+      const createResponse = await authPost(writeToken, routePrefix).send(def.create);
       const createdObj = createResponse.body;
 
-      const response = await agent.delete(`${routePrefix}/${createdObj.id}`);
+      const response = await authDelete(writeToken, `${routePrefix}/${createdObj.id}`);
 
       expect(response.status).toBe(204);
     });

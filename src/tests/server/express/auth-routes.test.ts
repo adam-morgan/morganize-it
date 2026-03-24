@@ -19,29 +19,37 @@ describe("Express - Auth Routes", () => {
       expect(response.status).toBe(401);
     });
 
-    it("should return 200 if valid email and password specified", async () => {
+    it("should return 200 with user and token if valid credentials", async () => {
       const response = await request(app)
         .post("/api/auth/login")
         .send({ email: "user1@gmail.com", password: "password1" });
 
       expect(response.status).toBe(200);
       expect(response.body.user).toBeDefined();
+      expect(response.body.token).toBeDefined();
+      expect(typeof response.body.token).toBe("string");
     });
   });
 
   describe("GET /api/auth/whoami", () => {
-    it("should return 200 if user is not logged in", async () => {
+    it("should return 200 with empty object if no token", async () => {
       const response = await request(app).get("/api/auth/whoami").send();
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({});
     });
 
-    it("should return 200 if user is logged in", async () => {
-      const agent = request.agent(app);
-      await agent.post("/api/auth/login").send({ email: "user1@gmail.com", password: "password1" });
+    it("should return 200 with user if valid token", async () => {
+      const loginResponse = await request(app)
+        .post("/api/auth/login")
+        .send({ email: "user1@gmail.com", password: "password1" });
 
-      const whoamiResponse = await agent.get("/api/auth/whoami").send();
+      const token = loginResponse.body.token;
+
+      const whoamiResponse = await request(app)
+        .get("/api/auth/whoami")
+        .set("Authorization", `Bearer ${token}`)
+        .send();
 
       expect(whoamiResponse.status).toBe(200);
       expect(whoamiResponse.body.email).toBe("user1@gmail.com");
@@ -49,16 +57,10 @@ describe("Express - Auth Routes", () => {
   });
 
   describe("POST /api/auth/logout", () => {
-    it("should return 200 and user session destroyed", async () => {
-      const agent = request.agent(app);
-      await agent.post("/api/auth/login").send({ email: "user1@gmail.com", password: "password1" });
-
-      const logoutResponse = await agent.post("/api/auth/logout").send();
+    it("should return 200", async () => {
+      const logoutResponse = await request(app).post("/api/auth/logout").send();
 
       expect(logoutResponse.status).toBe(200);
-
-      const whoamiResponse = await agent.get("/api/auth/whoami").send();
-      expect(whoamiResponse.body).toEqual({});
     });
   });
 
@@ -71,7 +73,7 @@ describe("Express - Auth Routes", () => {
       expect(response.status).toBe(400);
     });
 
-    it("should return 201 if account created", async () => {
+    it("should return 201 with user and token if account created", async () => {
       const response = await request(app)
         .post("/api/auth/create-account")
         .send({ email: "new-account@gmail.com", password: "password123" });
@@ -80,6 +82,8 @@ describe("Express - Auth Routes", () => {
       expect(response.body.user).toBeDefined();
       expect(response.body.user.email).toBe("new-account@gmail.com");
       expect(response.body.user.password).toBeUndefined();
+      expect(response.body.token).toBeDefined();
+      expect(typeof response.body.token).toBe("string");
     });
   });
 });

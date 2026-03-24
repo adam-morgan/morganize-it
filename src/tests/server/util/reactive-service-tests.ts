@@ -48,7 +48,7 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
       it(name, async () => {
         const findResponse = await firstValueFrom(def.svc.find(query.options));
 
-        const recordIds = findResponse.map((r) => r.id);
+        const recordIds = findResponse.items.map((r) => r.id);
 
         if (query.options.sort != null) {
           expect(recordIds).toEqual(query.recordIds);
@@ -57,6 +57,38 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
         }
       });
     }
+  });
+
+  describe("#find cursor pagination", () => {
+    it("should paginate through results using cursor", async () => {
+      // Get first page
+      const firstPage = await firstValueFrom(
+        def.svc.find({ sort: [{ property: "id", direction: "asc" }], limit: 1 })
+      );
+
+      expect(firstPage.items).toHaveLength(1);
+      expect(firstPage.nextCursor).toBeDefined();
+
+      // Get second page using cursor
+      const secondPage = await firstValueFrom(
+        def.svc.find({
+          sort: [{ property: "id", direction: "asc" }],
+          limit: 1,
+          cursor: firstPage.nextCursor,
+        })
+      );
+
+      expect(secondPage.items).toHaveLength(1);
+      expect(secondPage.items[0].id).not.toBe(firstPage.items[0].id);
+    });
+
+    it("should return no nextCursor on last page", async () => {
+      const result = await firstValueFrom(
+        def.svc.find({ sort: [{ property: "id", direction: "asc" }], limit: 1000 })
+      );
+
+      expect(result.nextCursor).toBeUndefined();
+    });
   });
 
   describe("#findById", () => {
