@@ -3,7 +3,7 @@ import express, { Application, Request, Response } from "express";
 import { authRoutes } from "./routes/auth";
 import { notebookRoutes } from "./routes/notebook";
 import packageJSON from "../../../package.json";
-import { configureSession } from "./session";
+import { jwtMiddleware } from "./middleware/jwt";
 import { handleErrors } from "./errorHandling";
 
 const app: Application = express();
@@ -13,7 +13,7 @@ app.use(express.json({ limit: "20mb" }));
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 
-configureSession(app);
+app.use(jwtMiddleware);
 
 app.use("/api", apiRouter);
 

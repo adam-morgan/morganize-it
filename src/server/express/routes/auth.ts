@@ -1,6 +1,7 @@
 import { createAccount, login, whoami } from "@/server/http/routes/auth";
+import { signToken } from "@/server/auth/jwt";
 import { Request, Response, Router } from "express";
-import { handleHttpResponse, handleHttpResponseAsync, makeHttpRequest } from "../util";
+import { handleHttpResponseAsync, handleHttpResponse, makeHttpRequest } from "../util";
 
 export const authRoutes = (router: Router) => {
   router.get("/auth/whoami", (req: Request<void>, res: Response<User | ApiError | {}>) => {
@@ -14,18 +15,18 @@ export const authRoutes = (router: Router) => {
 
       httpResponsePromise.then((httpResponse) => {
         if (httpResponse.status < 400) {
-          req.session.userId = (httpResponse.body as LoginResponse).user?.id;
+          const loginResponse = httpResponse.body as LoginResponse;
+          const token = signToken({ userId: loginResponse.user!.id });
+          handleHttpResponse({ ...httpResponse, body: { ...loginResponse, token } }, res);
+        } else {
+          handleHttpResponse(httpResponse, res);
         }
-
-        handleHttpResponse(httpResponse, res);
       });
     }
   );
 
-  router.post("/auth/logout", (req: Request<void>, res: Response<void>) => {
-    req.session.destroy(() => {
-      res.status(200).end();
-    });
+  router.post("/auth/logout", (_req: Request<void>, res: Response<void>) => {
+    res.status(200).end();
   });
 
   router.post(
@@ -35,10 +36,12 @@ export const authRoutes = (router: Router) => {
 
       httpResponsePromise.then((httpResponse) => {
         if (httpResponse.status < 400) {
-          req.session.userId = (httpResponse.body as CreateAccountResponse).user?.id;
+          const createResponse = httpResponse.body as CreateAccountResponse;
+          const token = signToken({ userId: createResponse.user!.id });
+          handleHttpResponse({ ...httpResponse, body: { ...createResponse, token } }, res);
+        } else {
+          handleHttpResponse(httpResponse, res);
         }
-
-        handleHttpResponse(httpResponse, res);
       });
     }
   );

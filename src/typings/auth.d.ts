@@ -15,6 +15,7 @@ type LoginRequest = {
 
 type LoginResponse = {
   user: User;
+  token?: string;
 };
 
 type CreateAccountRequest = {
@@ -24,4 +25,5 @@ type CreateAccountRequest = {
 
 type CreateAccountResponse = {
   user: User;
+  token?: string;
 };

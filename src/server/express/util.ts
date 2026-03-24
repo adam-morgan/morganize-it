@@ -21,7 +21,7 @@ export const makeHttpRequest = <T>(expressReq: Request<T>): HttpRequest<T> => {
     headers: new HttpHeaders(headers),
     params: expressReq.params as { [key: string]: string },
     query: expressReq.query as ParsedUrlQuery,
-    userId: expressReq.session?.userId,
+    userId: expressReq.jwtUserId,
   };
 };
 
