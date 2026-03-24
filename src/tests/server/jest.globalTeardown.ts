@@ -1,7 +1,5 @@
-import { destroyKnex } from "../../server/db/sql/knex";
-
 const globalTeardown = async (): Promise<void> => {
-  await destroyKnex();
+  // Cleanup handled per-worker in jest.setup.ts afterAll
 };
 
 export default globalTeardown;

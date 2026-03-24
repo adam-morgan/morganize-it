@@ -1,12 +1,10 @@
 import dotenv from "dotenv";
-import { getKnex } from "../../server/db/sql/knex";
 
 dotenv.config({ path: ".env.test" });
 
 const globalSetup = async (): Promise<void> => {
-  const knexInstance = getKnex();
-  await knexInstance.migrate.latest();
-  await knexInstance.seed.run();
+  // Migrations and seeds run per-worker in jest.setup.ts
+  // (required for in-memory SQLite where each worker has its own DB)
 };
 
 export default globalSetup;
