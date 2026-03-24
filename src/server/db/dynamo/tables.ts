@@ -18,3 +18,10 @@ export const usersTableSchema: DynamoTableSchema = {
 export const notebooksTableSchema: DynamoTableSchema = {
   primaryKey: { partition: "userId", sort: "id" },
 };
+
+export const notesTableSchema: DynamoTableSchema = {
+  primaryKey: { partition: "userId", sort: "id" },
+  indexes: {
+    notebookIndex: { partition: "notebookId", sort: "id" },
+  },
+};

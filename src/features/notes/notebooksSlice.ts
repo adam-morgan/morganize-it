@@ -8,6 +8,8 @@ type NotebooksSlice = {
   notebooks: Notebook[];
   initialize: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
+  updateNotebook: (id: string, name: string) => Observable<Notebook>;
+  deleteNotebook: (id: string) => Observable<void>;
   reset: () => void;
 };
 
@@ -38,5 +40,31 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
       .pipe(
         tap((notebook) => set((state) => ({ ...state, notebooks: [...state.notebooks, notebook] })))
       );
+  },
+  updateNotebook: (id, name) => {
+    const user = useAuthSlice.getState().user;
+    const notesSvc = getNotesService(user as User);
+
+    return notesSvc.updateNotebook(id, name).pipe(
+      tap((updated) =>
+        set((state) => ({
+          ...state,
+          notebooks: state.notebooks.map((nb) => (nb.id === id ? updated : nb)),
+        }))
+      )
+    );
+  },
+  deleteNotebook: (id) => {
+    const user = useAuthSlice.getState().user;
+    const notesSvc = getNotesService(user as User);
+
+    return notesSvc.deleteNotebook(id).pipe(
+      tap(() =>
+        set((state) => ({
+          ...state,
+          notebooks: state.notebooks.filter((nb) => nb.id !== id),
+        }))
+      )
+    );
   },
 }));

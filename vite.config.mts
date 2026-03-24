@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import eslint from "vite-plugin-eslint";
-import Pages from "vite-plugin-pages";
 import path from "path";
 
 // https://vitejs.dev/config/
@@ -13,10 +12,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
     eslint(),
-    Pages({
-      pagesDir: [{ dir: "pages", baseRoute: "" }],
-      extensions: ["tsx"],
-    }),
   ],
   resolve: {
     alias: {

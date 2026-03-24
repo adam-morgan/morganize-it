@@ -1,5 +1,5 @@
 import path from "path";
-import { usersTable, notebooksTable } from "./storage";
+import { usersTable, notebooksTable, notesTable } from "./storage";
 
 export const jwtSecret = new sst.Secret("JwtSecret");
 export const googleClientId = new sst.Secret("GoogleClientId");
@@ -122,6 +122,58 @@ api.route("PATCH /notebooks/{id}", {
 api.route("DELETE /notebooks/{id}", {
   handler: `${handlerBase}/notebooks/delete.handler`,
   link: notebookLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+// Note routes
+const noteLinks = [notesTable, jwtSecret];
+
+api.route("GET /notes", {
+  handler: `${handlerBase}/notes/find.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("POST /notes/find", {
+  handler: `${handlerBase}/notes/find.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("GET /notes/{id}", {
+  handler: `${handlerBase}/notes/findById.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("POST /notes", {
+  handler: `${handlerBase}/notes/create.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("PUT /notes/{id}", {
+  handler: `${handlerBase}/notes/update.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("PATCH /notes/{id}", {
+  handler: `${handlerBase}/notes/patch.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("DELETE /notes/{id}", {
+  handler: `${handlerBase}/notes/delete.handler`,
+  link: noteLinks,
   environment: defaultEnv,
   nodejs,
 });

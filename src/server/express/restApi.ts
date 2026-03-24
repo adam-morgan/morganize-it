@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { Application, Request, Response } from "express";
 import { authRoutes } from "./routes/auth";
 import { notebookRoutes } from "./routes/notebook";
+import { noteRoutes } from "./routes/note";
 import packageJSON from "../../../package.json";
 import { jwtMiddleware } from "./middleware/jwt";
 import { handleErrors } from "./errorHandling";
@@ -19,6 +20,7 @@ app.use("/api", apiRouter);
 
 authRoutes(apiRouter);
 notebookRoutes(apiRouter);
+noteRoutes(apiRouter);
 
 // Serve a successful response. For use with wait-on
 apiRouter.get("/health", (req, res) => {
@@ -36,5 +38,10 @@ apiRouter.get(`/version`, (req: Request, res: Response) => {
 handleErrors(app, apiRouter);
 
 app.use(express.static("./.local/vite/dist"));
+
+// SPA fallback: serve index.html for all non-API routes
+app.get(/^(?!\/api\/).*/, (_req, res) => {
+  res.sendFile("index.html", { root: "./.local/vite/dist" });
+});
 
 export default app;

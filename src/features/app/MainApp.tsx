@@ -8,15 +8,28 @@ import { ProfileIcon } from "../profile";
 import { useBreakpoint } from "../theme";
 import AppMenu from "./containers/AppMenu";
 import { useMainAppSlice } from "./mainAppSlice";
+import { NotebookView, NoteRoute, useNotebooksSlice } from "../notes";
+import { Routes, Route, useMatch } from "react-router-dom";
+
+const WelcomeView = () => (
+  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+    <p className="text-lg">Welcome to Morganize It</p>
+    <p className="text-sm">Select a notebook from the sidebar to get started</p>
+  </div>
+);
 
 const MainApp = () => {
   const { initialize, initialized, drawerOpen, setDrawerOpen } = useMainAppSlice();
+  const { notebooks } = useNotebooksSlice();
 
   const breakpoint = useBreakpoint();
 
   const mobileMode = breakpoint === "xs";
 
   const drawerWidth = "240px";
+
+  const notebookMatch = useMatch("/notebooks/:notebookId/*");
+  const notebookId = notebookMatch?.params.notebookId ?? null;
 
   useEffectOnMount(() => {
     initialize(breakpoint);
@@ -27,6 +40,8 @@ const MainApp = () => {
   }
 
   const showDrawerOffset = !mobileMode && drawerOpen;
+  const selectedNotebook = notebooks.find((nb) => nb.id === notebookId);
+  const appBarTitle = selectedNotebook ? selectedNotebook.name : "Home";
 
   return (
     <>
@@ -38,7 +53,7 @@ const MainApp = () => {
         }}
       >
         <AppBar
-          title="Home"
+          title={appBarTitle}
           leftChildren={
             <Button
               variant="ghost"
@@ -51,7 +66,11 @@ const MainApp = () => {
           }
           rightChildren={<ProfileIcon />}
         />
-        Here is some content
+        <Routes>
+          <Route path="/notebooks/:notebookId/notes/:noteId" element={<NoteRoute />} />
+          <Route path="/notebooks/:notebookId" element={<NotebookView />} />
+          <Route path="*" element={<WelcomeView />} />
+        </Routes>
       </div>
       <Drawer
         variant={mobileMode ? "temporary" : "persistent"}

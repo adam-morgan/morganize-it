@@ -26,6 +26,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "Notes": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "Users": {
       "name": string
       "type": "sst.aws.Dynamo"

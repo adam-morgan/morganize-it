@@ -1,4 +1,142 @@
 @import "tailwindcss";
+@import "tailwindcss/utilities";
+
+/* Novel / TipTap editor styles
+   The .novel-editor class is set on the TipTap contenteditable div via editorProps.attributes.class.
+   TipTap also adds .tiptap and .ProseMirror on the same element. */
+
+.novel-editor {
+  outline: none;
+  width: 100%;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.novel-editor > * + * {
+  margin-top: 0.75em;
+}
+
+/* Placeholder */
+.novel-editor p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Headings */
+.novel-editor h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.novel-editor h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.novel-editor h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Lists */
+.novel-editor ul,
+.novel-editor ol {
+  padding-left: 1.625em;
+}
+
+.novel-editor ul {
+  list-style-type: disc;
+}
+
+.novel-editor ol {
+  list-style-type: decimal;
+}
+
+.novel-editor li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.novel-editor li p {
+  margin: 0;
+}
+
+/* Task list */
+.novel-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.novel-editor ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.novel-editor ul[data-type="taskList"] li > label {
+  margin-top: 0.3rem;
+}
+
+.novel-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+/* Blockquote */
+.novel-editor blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--muted-foreground);
+}
+
+/* Code */
+.novel-editor pre {
+  background: var(--muted);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+
+.novel-editor pre code {
+  background: none;
+  color: inherit;
+  font-size: 0.875rem;
+  padding: 0;
+}
+
+.novel-editor code {
+  background: var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875rem;
+}
+
+/* Horizontal rule */
+.novel-editor hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+/* Links */
+.novel-editor a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
 
 @theme inline {
   --color-background: var(--background);

@@ -39,7 +39,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
     }
 
     if (def.readRouteUser != null) {
-      readToken = await loginForToken("user1@gmail.com", "password1");
+      readToken = await loginForToken(def.readRouteUser.email, def.readRouteUser.password!);
     }
   });
 

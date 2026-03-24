@@ -1,4 +1,4 @@
-import { usersTableSchema, notebooksTableSchema } from "../src/server/db/dynamo/tables";
+import { usersTableSchema, notebooksTableSchema, notesTableSchema } from "../src/server/db/dynamo/tables";
 
 export const usersTable = new sst.aws.Dynamo("Users", {
   fields: {
@@ -35,4 +35,31 @@ export const notebooksTable = new sst.aws.Dynamo("Notebooks", {
       rangeKey: notebooksTableSchema.primaryKey.sort,
     }),
   },
+});
+
+export const notesTable = new sst.aws.Dynamo("Notes", {
+  fields: {
+    [notesTableSchema.primaryKey.partition]: "string",
+    ...(notesTableSchema.primaryKey.sort && {
+      [notesTableSchema.primaryKey.sort]: "string",
+    }),
+    ...Object.fromEntries(
+      Object.values(notesTableSchema.indexes ?? {}).map((idx) => [idx.partition, "string"])
+    ),
+  },
+  primaryIndex: {
+    hashKey: notesTableSchema.primaryKey.partition,
+    ...(notesTableSchema.primaryKey.sort && {
+      rangeKey: notesTableSchema.primaryKey.sort,
+    }),
+  },
+  globalIndexes: Object.fromEntries(
+    Object.entries(notesTableSchema.indexes ?? {}).map(([name, idx]) => [
+      name,
+      {
+        hashKey: idx.partition,
+        ...(idx.sort && { rangeKey: idx.sort }),
+      },
+    ])
+  ),
 });

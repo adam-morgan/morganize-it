@@ -6,6 +6,15 @@ export const apiGet = <Resp>(path: string): Observable<Resp> => apiRequest("GET"
 export const apiPost = <Req, Resp>(path: string, body: Req): Observable<Resp> =>
   apiRequest("POST", path, body);
 
+export const apiPut = <Req, Resp>(path: string, body: Req): Observable<Resp> =>
+  apiRequest("PUT", path, body);
+
+export const apiPatch = <Req, Resp>(path: string, body: Req): Observable<Resp> =>
+  apiRequest("PATCH", path, body);
+
+export const apiDelete = <Resp>(path: string): Observable<Resp> =>
+  apiRequest("DELETE", path);
+
 const getAuthToken = (): string | null => {
   return localStorage.getItem("authToken");
 };
