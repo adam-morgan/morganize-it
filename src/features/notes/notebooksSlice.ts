@@ -8,11 +8,13 @@ type NotebooksSlice = {
   notebooks: Notebook[];
   initialize: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
+  reset: () => void;
 };
 
 export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
   initialized: false,
   notebooks: [],
+  reset: () => set({ initialized: false, notebooks: [] }),
   initialize: () => {
     if (get().initialized) {
       return of(undefined);

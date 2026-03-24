@@ -1,11 +1,11 @@
-import { apiGet, apiPost } from "@/utils/fetch";
+import { apiGet, apiPost, setAuthToken } from "@/utils/fetch";
 import { catchError, map, Observable, of, tap } from "rxjs";
 
 class AuthService {
   public getUser(): Observable<User | undefined> {
     const guestMode = localStorage.getItem("guestMode");
     if (guestMode === "true") {
-      return of({ id: 0, name: "Guest", email: "", isGuest: true } as GuestUser);
+      return of({ id: "0", name: "Guest", email: "", isGuest: true } as GuestUser);
     }
 
     return apiGet<User | {}>("/auth/whoami").pipe(
@@ -21,16 +21,33 @@ class AuthService {
 
   public doLogin(email: string, password: string): Observable<LoginResponse> {
     return apiPost<LoginRequest, LoginResponse>("/auth/login", { email, password }).pipe(
-      tap(() => localStorage.removeItem("guestMode"))
+      tap((response) => {
+        localStorage.removeItem("guestMode");
+        if (response.token) {
+          setAuthToken(response.token);
+        }
+      })
     );
   }
 
   public doLogout(): Observable<void> {
-    return apiPost("/auth/logout", {});
+    setAuthToken(null);
+    localStorage.removeItem("guestMode");
+    return of(undefined);
   }
 
   public createAccount(email: string, password: string): Observable<CreateAccountResponse> {
-    return apiPost("/auth/create-account", { email, password });
+    return apiPost<CreateAccountRequest, CreateAccountResponse>("/auth/create-account", {
+      email,
+      password,
+    }).pipe(
+      tap((response) => {
+        localStorage.removeItem("guestMode");
+        if (response.token) {
+          setAuthToken(response.token);
+        }
+      })
+    );
   }
 }
 

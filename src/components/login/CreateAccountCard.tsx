@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Observable } from "rxjs";
 
 type CreateAccountCardProps = {
-  createAccount: (email: string, password: string) => Observable<CreateAccountResponse>;
+  createAccount: (email: string, password: string) => Observable<unknown>;
   cancel: () => void;
 };
 

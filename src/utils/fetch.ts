@@ -6,6 +6,18 @@ export const apiGet = <Resp>(path: string): Observable<Resp> => apiRequest("GET"
 export const apiPost = <Req, Resp>(path: string, body: Req): Observable<Resp> =>
   apiRequest("POST", path, body);
 
+const getAuthToken = (): string | null => {
+  return localStorage.getItem("authToken");
+};
+
+export const setAuthToken = (token: string | null): void => {
+  if (token) {
+    localStorage.setItem("authToken", token);
+  } else {
+    localStorage.removeItem("authToken");
+  }
+};
+
 const apiRequest = <Req, Resp>(method: string, path: string, body?: Req): Observable<Resp> => {
   let url = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -20,9 +32,14 @@ const apiRequest = <Req, Resp>(method: string, path: string, body?: Req): Observ
 
   const fullPath = `${url}${_path}`;
 
-  const headers = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   return fromFetch(fullPath, {
     method,
