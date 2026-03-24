@@ -1,14 +1,6 @@
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
-import AddIcon from "@mui/icons-material/Add";
-import {
-  Box,
-  IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  ListSubheader,
-} from "@mui/material";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CreateNotebook, useNotebooksSlice } from "../../notes";
 import { useEffectOnMount } from "@/hooks/useEffectOnMount";
 
@@ -19,41 +11,34 @@ const AppMenu = () => {
   useEffectOnMount(() => reactiveQuery(initialize, "Loading...", () => {}));
 
   return (
-    <>
-      <List sx={{ width: "100%" }} component="nav">
-        <ListItem disablePadding>
-          <ListItemButton>
-            <ListItemText primary="Home" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-      <List
-        sx={{ width: "100%" }}
-        component="nav"
-        subheader={
-          <ListSubheader component="div" sx={{ bgcolor: "unset" }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              <ListItemText primary="Notebooks" />
-              <CreateNotebook
-                trigger={(open) => (
-                  <IconButton onClick={open}>
-                    <AddIcon />
-                  </IconButton>
-                )}
-              />
-            </Box>
-          </ListSubheader>
-        }
-      >
+    <nav className="w-full">
+      <ul className="py-2">
+        <li>
+          <button className="w-full px-4 py-2 text-left text-sm hover:bg-accent">Home</button>
+        </li>
+      </ul>
+      <div className="px-4 py-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase text-muted-foreground">Notebooks</span>
+          <CreateNotebook
+            trigger={(open) => (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={open}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+          />
+        </div>
+      </div>
+      <ul>
         {(notebooks ?? []).map((notebook) => (
-          <ListItem key={notebook.id} disablePadding>
-            <ListItemButton>
-              <ListItemText primary={notebook.name} />
-            </ListItemButton>
-          </ListItem>
+          <li key={notebook.id}>
+            <button className="w-full px-4 py-2 text-left text-sm hover:bg-accent">
+              {notebook.name}
+            </button>
+          </li>
         ))}
-      </List>
-    </>
+      </ul>
+    </nav>
   );
 };
 

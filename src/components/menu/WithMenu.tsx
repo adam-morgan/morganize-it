@@ -1,7 +1,10 @@
 import { ReactNode, useState } from "react";
-import { Menu as MuiMenu, MenuItem as MuiMenuItem } from "@mui/material";
-
-import styles from "./WithMenu.module.css";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type MenuItem = {
   label: string;
@@ -14,28 +17,27 @@ type WithMenuProps = {
 };
 
 const WithMenu = (props: WithMenuProps) => {
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const open = Boolean(anchorEl);
+  const [open, setOpen] = useState(false);
 
   return (
-    <>
-      <div className={styles.wrapper} onClick={(e) => setAnchorEl(e.currentTarget)}>
-        {props.children}
-      </div>
-      <MuiMenu anchorEl={anchorEl} open={open} onClose={() => setAnchorEl(null)}>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <div className="cursor-pointer">{props.children}</div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
         {props.items.map((item, index) => (
-          <MuiMenuItem
+          <DropdownMenuItem
             key={index}
             onClick={() => {
               item.onClick();
-              setAnchorEl(null);
+              setOpen(false);
             }}
           >
             {item.label}
-          </MuiMenuItem>
+          </DropdownMenuItem>
         ))}
-      </MuiMenu>
-    </>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

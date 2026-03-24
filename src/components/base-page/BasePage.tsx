@@ -1,5 +1,5 @@
 import { ThemeProvider } from "@/features/theme";
-import { Backdrop, Box, CircularProgress, Typography } from "@mui/material";
+import { Loader2 } from "lucide-react";
 
 type BasePageProps = {
   children: React.ReactNode;
@@ -9,24 +9,17 @@ type BasePageProps = {
 const BasePage = ({ children, maskText }: BasePageProps) => {
   return (
     <ThemeProvider>
-      <Box
-        sx={{
-          width: "100%",
-          height: "100%",
-          backgroundColor: (theme) => theme.palette.background.default,
-        }}
-      >
+      <div className="h-full w-full bg-background">
         {children}
-      </Box>
-      <Backdrop
-        sx={(theme) => ({ color: "#fff", zIndex: theme.zIndex.drawer + 1 })}
-        open={maskText != null}
-      >
-        <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
-          <CircularProgress color="inherit" />
-          <Typography>{maskText}</Typography>
-        </Box>
-      </Backdrop>
+      </div>
+      {maskText != null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="flex flex-col items-center gap-4 text-white">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p>{maskText}</p>
+          </div>
+        </div>
+      )}
     </ThemeProvider>
   );
 };

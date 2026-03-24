@@ -1,4 +1,13 @@
-import Dialog from "./Dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type PromptProps = {
   open: boolean;
@@ -10,15 +19,18 @@ type PromptProps = {
 
 const Prompt = (props: PromptProps) => {
   return (
-    <Dialog
-      open={props.open}
-      title={props.title}
-      description={props.promptText}
-      actions={[
-        { label: "Yes", onClick: props.onConfirm },
-        { label: "No", onClick: props.onCancel ?? (() => {}) },
-      ]}
-    />
+    <AlertDialog open={props.open}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{props.title}</AlertDialogTitle>
+          <AlertDialogDescription>{props.promptText}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={props.onCancel ?? (() => {})}>No</AlertDialogCancel>
+          <AlertDialogAction onClick={props.onConfirm}>Yes</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
 

@@ -1,7 +1,11 @@
-import { Alert, Button, FormControl, FormLabel, TextField, Typography } from "@mui/material";
-import { StyledLoginCard } from "./LoginCard";
 import { useState } from "react";
 import { Observable } from "rxjs";
+import { Loader2 } from "lucide-react";
+import { StyledLoginCard } from "./LoginCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type CreateAccountCardProps = {
   createAccount: (email: string, password: string) => Observable<unknown>;
@@ -65,23 +69,15 @@ const CreateAccountCard = (props: CreateAccountCardProps) => {
 
   return (
     <StyledLoginCard>
-      <Typography
-        component="h1"
-        variant="h4"
-        sx={{ width: "100%", fontSize: "clamp(2rem, 10vw, 2.15rem)" }}
-      >
-        Create Account
-      </Typography>
+      <h1 className="w-full text-[clamp(2rem,10vw,2.15rem)] font-bold">Create Account</h1>
       {createAccountError && (
-        <Alert severity="error" sx={{ width: "100%", mt: 2 }}>
-          {createAccountError}
+        <Alert variant="destructive" className="mt-2 w-full">
+          <AlertDescription>{createAccountError}</AlertDescription>
         </Alert>
       )}
-      <FormControl>
-        <FormLabel htmlFor="email">Email</FormLabel>
-        <TextField
-          error={Boolean(emailError)}
-          helperText={emailError}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
           id="email"
           type="email"
           name="email"
@@ -91,57 +87,43 @@ const CreateAccountCard = (props: CreateAccountCardProps) => {
           autoComplete="email"
           autoFocus
           required
-          fullWidth
-          variant="outlined"
-          color={emailError ? "error" : "primary"}
+          className={emailError ? "border-destructive" : ""}
         />
-      </FormControl>
-      <FormControl>
-        <FormLabel htmlFor="password">Password</FormLabel>
-        <TextField
-          error={Boolean(passwordError)}
-          helperText={passwordError}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
           name="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••"
           type="password"
           id="password"
-          autoFocus
           required
-          fullWidth
-          variant="outlined"
-          color={passwordError ? "error" : "primary"}
+          className={passwordError ? "border-destructive" : ""}
         />
-      </FormControl>
-      <FormControl>
-        <FormLabel htmlFor="confirmPassword">Confirm Password</FormLabel>
-        <TextField
-          error={Boolean(passwordConfirmError)}
-          helperText={passwordConfirmError}
+        {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <Input
           name="confirmPassword"
           value={passwordConfirm}
           onChange={(e) => setPasswordConfirm(e.target.value)}
           placeholder="••••••"
           type="password"
           id="confirmPassword"
-          autoFocus
           required
-          fullWidth
-          variant="outlined"
-          color={passwordConfirmError ? "error" : "primary"}
+          className={passwordConfirmError ? "border-destructive" : ""}
         />
-      </FormControl>
-      <Button
-        type="submit"
-        fullWidth
-        variant="contained"
-        loading={isCreatingAccount}
-        onClick={createAccount}
-      >
+        {passwordConfirmError && <p className="text-sm text-destructive">{passwordConfirmError}</p>}
+      </div>
+      <Button className="w-full" disabled={isCreatingAccount} onClick={createAccount}>
+        {isCreatingAccount && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Create Account
       </Button>
-      <Button fullWidth onClick={props.cancel}>
+      <Button variant="outline" className="w-full" onClick={props.cancel}>
         Cancel
       </Button>
     </StyledLoginCard>

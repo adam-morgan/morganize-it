@@ -1,20 +1,22 @@
 import {
-  Button,
-  DialogActions,
+  Dialog as ShadDialog,
   DialogContent,
-  DialogContentText,
-  DialogProps as MatDialogProps,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
-  Dialog as MatDialog,
-} from "@mui/material";
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { ReactNode } from "react";
+
+export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl";
 
 export type DialogProps = {
   open: boolean;
   title: string;
   description?: string;
   content?: ReactNode;
-  size?: MatDialogProps["maxWidth"];
+  size?: DialogSize;
   actions?: {
     label: string;
     onClick: () => void | Promise<void>;
@@ -22,24 +24,39 @@ export type DialogProps = {
   }[];
 };
 
+const sizeClasses: Record<DialogSize, string> = {
+  xs: "max-w-xs",
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-xl",
+};
+
 const Dialog = (props: DialogProps) => {
   return (
-    <MatDialog open={props.open} fullWidth maxWidth={props.size ?? "sm"}>
-      <DialogTitle>{props.title}</DialogTitle>
-      <DialogContent>
-        {props.description && <DialogContentText>{props.description}</DialogContentText>}
+    <ShadDialog open={props.open}>
+      <DialogContent className={sizeClasses[props.size ?? "sm"]}>
+        <DialogHeader>
+          <DialogTitle>{props.title}</DialogTitle>
+          {props.description && <DialogDescription>{props.description}</DialogDescription>}
+        </DialogHeader>
         {props.content}
+        {props.actions?.length && (
+          <DialogFooter>
+            {props.actions.map((action, index) => (
+              <Button
+                key={index}
+                variant={index === 0 ? "default" : "outline"}
+                disabled={action.disabled === true}
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
+          </DialogFooter>
+        )}
       </DialogContent>
-      {props.actions?.length && (
-        <DialogActions>
-          {props.actions.map((action, index) => (
-            <Button key={index} disabled={action.disabled === true} onClick={action.onClick}>
-              {action.label}
-            </Button>
-          ))}
-        </DialogActions>
-      )}
-    </MatDialog>
+    </ShadDialog>
   );
 };
 

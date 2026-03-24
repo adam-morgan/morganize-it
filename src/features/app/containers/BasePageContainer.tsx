@@ -1,8 +1,9 @@
 import { BasePage } from "@/components";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { useMaskSlice } from "../maskSlice";
 import { useAlertSlice } from "../alertSlice";
-import { Alert, Snackbar } from "@mui/material";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 const BasePageContainer = ({ children }: { children: ReactNode }) => {
   const { getMaskText } = useMaskSlice();
@@ -10,18 +11,26 @@ const BasePageContainer = ({ children }: { children: ReactNode }) => {
 
   const alert = getCurrentAlert();
 
+  useEffect(() => {
+    if (!alert) return;
+
+    const typeMap = {
+      error: toast.error,
+      warning: toast.warning,
+      info: toast.info,
+      success: toast.success,
+    } as const;
+
+    const show = typeMap[alert.severity] ?? toast;
+    show(alert.message);
+    popAlert();
+  }, [alert, popAlert]);
+
   return (
     <BasePage maskText={getMaskText()}>
       <>
         {children}
-        <Snackbar
-          open={Boolean(alert)}
-          autoHideDuration={5000}
-          onClose={popAlert}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
-          <Alert severity={alert?.severity}>{alert?.message}</Alert>
-        </Snackbar>
+        <Toaster position="bottom-center" />
       </>
     </BasePage>
   );

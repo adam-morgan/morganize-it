@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
-import { Box, Drawer as MuiDrawer } from "@mui/material";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 type DrawerProps = {
   width?: string;
@@ -16,25 +17,26 @@ const Drawer = ({
   onClose,
   children,
 }: DrawerProps) => {
+  if (variant === "temporary") {
+    return (
+      <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose?.()}>
+        <SheetContent side="left" className="w-[240px] p-0">
+          {children}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
-    <Box component="nav" sx={{ width, flexShrink: { sm: 0 } }}>
-      <MuiDrawer
-        variant={variant}
-        open={open}
-        onClose={onClose}
-        transitionDuration={225}
-        sx={{
-          "& .MuiDrawer-paper": { boxSizing: "border-box", width },
-        }}
-        slotProps={{
-          root: {
-            keepMounted: true,
-          },
-        }}
-      >
-        {children}
-      </MuiDrawer>
-    </Box>
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-30 h-full border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-225",
+        open ? "translate-x-0" : "-translate-x-full"
+      )}
+      style={{ width }}
+    >
+      {children}
+    </aside>
   );
 };
 

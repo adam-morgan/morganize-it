@@ -1,5 +1,5 @@
-import { AccountCircle } from "@mui/icons-material";
-import { Avatar as MuiAvatar } from "@mui/material";
+import { CircleUser } from "lucide-react";
+import { Avatar as ShadAvatar, AvatarFallback } from "@/components/ui/avatar";
 
 type AvatarProps = {
   user: User;
@@ -8,7 +8,7 @@ type AvatarProps = {
 
 const Avatar = ({ user, onClick }: AvatarProps) => {
   if ((user as GuestUser).isGuest || !user.name) {
-    return <AccountCircle />;
+    return <CircleUser className="h-6 w-6" />;
   }
 
   const parts = user.name.trim().split(/\s+/);
@@ -21,9 +21,9 @@ const Avatar = ({ user, onClick }: AvatarProps) => {
   }
 
   return (
-    <MuiAvatar sx={{ bgcolor: (style) => style.palette.primary.main }} onClick={onClick}>
-      {letters.toUpperCase()}
-    </MuiAvatar>
+    <ShadAvatar className="cursor-pointer" onClick={onClick}>
+      <AvatarFallback>{letters.toUpperCase()}</AvatarFallback>
+    </ShadAvatar>
   );
 };
 

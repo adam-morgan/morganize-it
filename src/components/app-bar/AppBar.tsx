@@ -1,5 +1,3 @@
-import { AppBar as MuiAppBar, Toolbar, Typography } from "@mui/material";
-
 type AppBarProps = {
   title: string;
   leftChildren?: React.ReactNode;
@@ -7,20 +5,14 @@ type AppBarProps = {
 };
 
 const AppBar = (props: AppBarProps) => {
-  const toolbar = (
-    <Toolbar>
-      {props.leftChildren}
-      <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-        {props.title}
-      </Typography>
-      {props.rightChildren}
-    </Toolbar>
-  );
-
   return (
-    <MuiAppBar position="relative" sx={{ transition: "225ms" }}>
-      {toolbar}
-    </MuiAppBar>
+    <header className="sticky top-0 z-40 bg-card text-card-foreground shadow-md border-b border-border transition-all duration-225">
+      <div className="flex h-16 items-center px-4">
+        {props.leftChildren}
+        <h1 className="flex-1 text-lg font-semibold">{props.title}</h1>
+        {props.rightChildren}
+      </div>
+    </header>
   );
 };
 

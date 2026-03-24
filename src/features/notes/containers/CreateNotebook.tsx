@@ -1,5 +1,6 @@
 import { DialogTrigger } from "@/components/dialog";
-import { TextField } from "@mui/material";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ReactNode, useState } from "react";
 import { useNotebooksSlice } from "../notebooksSlice";
 import { take } from "rxjs";
@@ -18,17 +19,18 @@ const CreateNotebook = ({ trigger }: CreateNotebookButtonProps) => {
     <DialogTrigger
       title="Create Notebook"
       content={
-        <TextField
-          autoFocus
-          required
-          margin="dense"
-          name="name"
-          label="Notebook Name"
-          type="text"
-          fullWidth
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <div className="flex flex-col gap-2 pt-2">
+          <Label htmlFor="notebook-name">Notebook Name</Label>
+          <Input
+            autoFocus
+            required
+            name="name"
+            id="notebook-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
       }
       size="xs"
       actions={[

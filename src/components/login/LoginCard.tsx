@@ -1,27 +1,17 @@
-import {
-  Alert,
-  Button,
-  Divider,
-  FormControl,
-  FormLabel,
-  Link,
-  styled,
-  TextField,
-  Typography,
-} from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { Observable } from "rxjs";
+import { Loader2 } from "lucide-react";
 import Card from "../card/Card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 
-export const StyledLoginCard = styled(Card)(({ theme }) => ({
-  alignSelf: "center",
-  width: "100%",
-  margin: "auto",
-  [theme.breakpoints.up("sm")]: {
-    maxWidth: "450px",
-  },
-}));
+export const StyledLoginCard = ({ children }: { children: React.ReactNode }) => (
+  <Card className="mx-auto w-full self-center sm:max-w-[450px]">{children}</Card>
+);
 
 type LoginCardProps = {
   continueAsGuest: () => void;
@@ -110,35 +100,24 @@ const LoginCard = (props: LoginCardProps) => {
 
   return (
     <StyledLoginCard>
-      <Button
-        variant="text"
-        sx={{ width: "min-content", alignSelf: "center", whiteSpace: "nowrap" }}
-        onClick={() => props.continueAsGuest()}
-      >
+      <Button variant="ghost" className="w-min self-center whitespace-nowrap" onClick={() => props.continueAsGuest()}>
         Continue without signing in
       </Button>
-      <Typography
-        component="h1"
-        variant="h4"
-        sx={{ width: "100%", fontSize: "clamp(2rem, 10vw, 2.15rem)" }}
-      >
-        Sign in
-      </Typography>
-      <div
-        ref={googleButtonRef}
-        style={{ width: "100%", display: "flex", justifyContent: "center" }}
-      />
-      <Divider sx={{ width: "100%" }}>or</Divider>
+      <h1 className="w-full text-[clamp(2rem,10vw,2.15rem)] font-bold">Sign in</h1>
+      <div ref={googleButtonRef} className="flex w-full justify-center" />
+      <div className="flex w-full items-center gap-4">
+        <Separator className="flex-1" />
+        <span className="text-sm text-muted-foreground">or</span>
+        <Separator className="flex-1" />
+      </div>
       {loginError && (
-        <Alert severity="error" sx={{ width: "100%", mt: 2 }}>
-          {loginError}
+        <Alert variant="destructive" className="mt-2 w-full">
+          <AlertDescription>{loginError}</AlertDescription>
         </Alert>
       )}
-      <FormControl>
-        <FormLabel htmlFor="email">Email</FormLabel>
-        <TextField
-          error={Boolean(emailError)}
-          helperText={emailError}
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
           id="email"
           type="email"
           name="email"
@@ -148,16 +127,13 @@ const LoginCard = (props: LoginCardProps) => {
           autoComplete="email"
           autoFocus
           required
-          fullWidth
-          variant="outlined"
-          color={emailError ? "error" : "primary"}
+          className={emailError ? "border-destructive" : ""}
         />
-      </FormControl>
-      <FormControl>
-        <FormLabel htmlFor="password">Password</FormLabel>
-        <TextField
-          error={Boolean(passwordError)}
-          helperText={passwordError}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
           name="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -165,22 +141,21 @@ const LoginCard = (props: LoginCardProps) => {
           type="password"
           id="password"
           autoComplete="current-password"
-          autoFocus
           required
-          fullWidth
-          variant="outlined"
-          color={passwordError ? "error" : "primary"}
+          className={passwordError ? "border-destructive" : ""}
         />
-      </FormControl>
-      <Button type="submit" fullWidth variant="contained" loading={isLoggingIn} onClick={signIn}>
+        {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+      </div>
+      <Button className="w-full" disabled={isLoggingIn} onClick={signIn}>
+        {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign In
       </Button>
-      <Typography sx={{ textAlign: "center" }}>
+      <p className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <Link component={RouterLink} to="/create-account" underline="none">
+        <RouterLink to="/create-account" className="text-primary underline-offset-4 hover:underline">
           Create one
-        </Link>
-      </Typography>
+        </RouterLink>
+      </p>
     </StyledLoginCard>
   );
 };

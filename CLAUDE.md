@@ -61,7 +61,7 @@ SST (Ion) configuration for AWS deployment to `ca-central-1`:
 - **Routing**: Vite Pages plugin generates routes from `src/pages/` directory
 - **HTTP**: RxJS `fromFetch` wrapper (`src/utils/fetch.ts`) with JWT Bearer token in `Authorization` header
 - **Auth**: JWT tokens stored in localStorage (`setAuthToken`/`getAuthToken`)
-- **UI**: Material-UI components
+- **UI**: shadcn/ui components (Radix UI + Tailwind CSS v4). Component primitives in `src/components/ui/`. Dark/light mode via CSS class on `<html>`. `cn()` utility in `src/lib/utils.ts`.
 - **Dev proxy**: Vite proxies `/api` requests to Express backend
 
 ### Build Outputs

@@ -1,29 +1,13 @@
 import { LoginCard } from "@/components";
-import { Stack, styled } from "@mui/material";
 import { useNavigate } from "react-router";
 import { take, tap } from "rxjs";
 import { useAuthSlice } from "../authSlice";
 
-export const StyledLoginContainer = styled(Stack)(({ theme }) => ({
-  height: "calc((1 - var(--template-frame-height, 0)) * 100dvh)",
-  minHeight: "100%",
-  padding: theme.spacing(2),
-  [theme.breakpoints.up("sm")]: {
-    padding: theme.spacing(4),
-  },
-  "&::before": {
-    content: '""',
-    display: "block",
-    position: "absolute",
-    zIndex: -1,
-    inset: 0,
-    backgroundImage: "radial-gradient(ellipse at 50% 50%, hsl(210, 100%, 97%), hsl(0, 0%, 100%))",
-    backgroundRepeat: "no-repeat",
-    ...theme.applyStyles(theme.palette.mode, {
-      backgroundImage: "radial-gradient(at 50% 50%, hsla(210, 100%, 16%, 0.5), hsl(220, 30%, 5%))",
-    }),
-  },
-}));
+export const StyledLoginContainer = ({ children }: { children: React.ReactNode }) => (
+  <div className="relative flex min-h-dvh flex-col items-center justify-center bg-background p-4 sm:p-8 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:bg-[radial-gradient(ellipse_at_50%_50%,hsl(210_100%_97%),hsl(210_20%_98%))] before:bg-no-repeat dark:before:bg-[radial-gradient(at_50%_50%,hsl(217_50%_18%),hsl(224_20%_10%))]">
+    {children}
+  </div>
+);
 
 const LoginContainer = () => {
   const navigate = useNavigate();
