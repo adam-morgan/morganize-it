@@ -27,10 +27,14 @@ export const StyledLoginContainer = styled(Stack)(({ theme }) => ({
 
 const LoginContainer = () => {
   const navigate = useNavigate();
-  const { login, continueAsGuest } = useAuthSlice();
+  const { login, googleLogin, continueAsGuest } = useAuthSlice();
 
   const _login = (email: string, password: string) => {
     return login(email, password).pipe(tap(() => navigate("/")));
+  };
+
+  const _googleLogin = (credential: string) => {
+    return googleLogin(credential).pipe(tap(() => navigate("/")));
   };
 
   const _continueAsGuest = () => {
@@ -41,7 +45,7 @@ const LoginContainer = () => {
 
   return (
     <StyledLoginContainer>
-      <LoginCard signIn={_login} continueAsGuest={_continueAsGuest} />
+      <LoginCard signIn={_login} googleLogin={_googleLogin} continueAsGuest={_continueAsGuest} />
     </StyledLoginContainer>
   );
 };

@@ -1,4 +1,4 @@
-import { createAccount, login, whoami } from "@/server/http/routes/auth";
+import { createAccount, googleLogin, login, whoami } from "@/server/http/routes/auth";
 import { signToken } from "@/server/auth/jwt";
 import { Request, Response, Router } from "express";
 import { handleHttpResponseAsync, handleHttpResponse, makeHttpRequest } from "../util";
@@ -28,6 +28,23 @@ export const authRoutes = (router: Router) => {
   router.post("/auth/logout", (_req: Request<void>, res: Response<void>) => {
     res.status(200).end();
   });
+
+  router.post(
+    "/auth/google",
+    (req: Request<GoogleLoginRequest>, res: Response<GoogleLoginResponse | ApiError>) => {
+      const httpResponsePromise = googleLogin(makeHttpRequest(req));
+
+      httpResponsePromise.then((httpResponse) => {
+        if (httpResponse.status < 400) {
+          const loginResponse = httpResponse.body as GoogleLoginResponse;
+          const token = signToken({ userId: loginResponse.user!.id });
+          handleHttpResponse({ ...httpResponse, body: { ...loginResponse, token } }, res);
+        } else {
+          handleHttpResponse(httpResponse, res);
+        }
+      });
+    }
+  );
 
   router.post(
     "/auth/create-account",

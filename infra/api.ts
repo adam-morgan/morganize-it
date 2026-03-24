@@ -1,8 +1,8 @@
 import path from "path";
-import * as sst from "sst";
 import { usersTable, notebooksTable } from "./storage";
 
 export const jwtSecret = new sst.Secret("JwtSecret");
+export const googleClientId = new sst.Secret("GoogleClientId");
 
 const handlerBase = "src/server/lambda/handlers";
 
@@ -56,6 +56,13 @@ api.route("POST /auth/login", {
 api.route("POST /auth/create-account", {
   handler: `${handlerBase}/auth/create-account.handler`,
   link: [usersTable, jwtSecret],
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("POST /auth/google", {
+  handler: `${handlerBase}/auth/google-login.handler`,
+  link: [usersTable, jwtSecret, googleClientId],
   environment: defaultEnv,
   nodejs,
 });

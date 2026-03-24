@@ -6,6 +6,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "GoogleClientId": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "JwtSecret": {
       "type": "sst.sst.Secret"
       "value": string

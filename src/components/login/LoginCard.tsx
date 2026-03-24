@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  Divider,
   FormControl,
   FormLabel,
   Link,
@@ -8,7 +9,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
 import { Observable } from "rxjs";
 import Card from "../card/Card";
@@ -25,6 +26,7 @@ export const StyledLoginCard = styled(Card)(({ theme }) => ({
 type LoginCardProps = {
   continueAsGuest: () => void;
   signIn: (email: string, password: string) => Observable<void>;
+  googleLogin: (credential: string) => Observable<void>;
 };
 
 const LoginCard = (props: LoginCardProps) => {
@@ -34,6 +36,45 @@ const LoginCard = (props: LoginCardProps) => {
   const [passwordError, setPasswordError] = useState<string | undefined>();
   const [loginError, setLoginError] = useState<string | undefined>();
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = () => {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleResponse,
+      });
+      if (googleButtonRef.current) {
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          width: "100%",
+        });
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  const handleGoogleResponse = (response: { credential: string }) => {
+    setIsLoggingIn(true);
+    props.googleLogin(response.credential).subscribe({
+      complete: () => setIsLoggingIn(false),
+      error: (e) => {
+        setIsLoggingIn(false);
+        setLoginError(e.message);
+      },
+    });
+  };
 
   const signIn = () => {
     let valid = true;
@@ -83,6 +124,11 @@ const LoginCard = (props: LoginCardProps) => {
       >
         Sign in
       </Typography>
+      <div
+        ref={googleButtonRef}
+        style={{ width: "100%", display: "flex", justifyContent: "center" }}
+      />
+      <Divider sx={{ width: "100%" }}>or</Divider>
       {loginError && (
         <Alert severity="error" sx={{ width: "100%", mt: 2 }}>
           {loginError}

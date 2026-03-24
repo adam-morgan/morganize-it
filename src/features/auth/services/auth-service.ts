@@ -36,6 +36,17 @@ class AuthService {
     return of(undefined);
   }
 
+  public doGoogleLogin(credential: string): Observable<GoogleLoginResponse> {
+    return apiPost<GoogleLoginRequest, GoogleLoginResponse>("/auth/google", { credential }).pipe(
+      tap((response) => {
+        localStorage.removeItem("guestMode");
+        if (response.token) {
+          setAuthToken(response.token);
+        }
+      })
+    );
+  }
+
   public createAccount(email: string, password: string): Observable<CreateAccountResponse> {
     return apiPost<CreateAccountRequest, CreateAccountResponse>("/auth/create-account", {
       email,

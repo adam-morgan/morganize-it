@@ -1,4 +1,5 @@
 import { getAuthService } from "@/server/features";
+import { verifyGoogleToken } from "@/server/auth/google";
 import { HttpRequest } from "../request";
 import { HttpResponse } from "../response";
 import { error } from "@/server/logging";
@@ -53,4 +54,26 @@ export const createAccount = async (
 
   const createdUser = await authService.createUser(user);
   return { status: 201, body: { user: createdUser } };
+};
+
+export const googleLogin = async (
+  req: HttpRequest<GoogleLoginRequest>
+): Promise<HttpResponse<GoogleLoginResponse | ApiError>> => {
+  try {
+    const { email, givenName, familyName } = await verifyGoogleToken(req.body.credential);
+    const authService = getAuthService();
+
+    const existingUser = await authService.getUserByEmail(email, false);
+
+    if (existingUser) {
+      return { status: 200, body: { user: existingUser, isNewUser: false } };
+    }
+
+    const name = [givenName, familyName].filter(Boolean).join(" ") || email.split("@")[0];
+    const createdUser = await authService.createUser({ email, name });
+    return { status: 201, body: { user: createdUser, isNewUser: true } };
+  } catch (e) {
+    error((e as Error).message, e as Error);
+    return { status: 401, body: { message: "Google authentication failed" } };
+  }
 };

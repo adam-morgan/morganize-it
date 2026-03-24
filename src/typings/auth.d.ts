@@ -27,3 +27,13 @@ type CreateAccountResponse = {
   user: User;
   token?: string;
 };
+
+type GoogleLoginRequest = {
+  credential: string;
+};
+
+type GoogleLoginResponse = {
+  user: User;
+  token?: string;
+  isNewUser: boolean;
+};
