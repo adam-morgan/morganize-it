@@ -5,4 +5,5 @@ export const initDb = async () => {
   if (getDbInstanceType() === "POSTGRESQL") {
     await getKnex().migrate.latest();
   }
+  // DynamoDB tables are created by SST infrastructure — no initialization needed
 };
