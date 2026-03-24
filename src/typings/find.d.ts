@@ -2,7 +2,12 @@ type FindOptions = {
   criteria?: Criteria;
   sort?: Sort[];
   limit?: number;
-  offset?: number;
+  cursor?: string;
+};
+
+type PageResult<T> = {
+  items: T[];
+  nextCursor?: string;
 };
 
 type Criteria = AndCriteria | OrCriteria | NotCriteria | FilterCriteria;

@@ -8,9 +8,9 @@ export class UserEntityReactiveKnexService<T extends UserEntity> extends Reactiv
     super(table, columns, idProperty);
   }
 
-  override find(options?: FindOptions, userId?: string): Observable<T[]> {
-    const query = buildQuery(this.table, options, this.applyUserIdCriteria(userId));
-    return from(query.select(this.columns).then((rows) => rows as T[]));
+  override find(options?: FindOptions, userId?: string): Observable<PageResult<T>> {
+    const { query, toPageResult } = buildQuery<T>(this.table, options, this.applyUserIdCriteria(userId));
+    return from(query.select(this.columns).then((rows) => toPageResult(rows as T[])));
   }
 
   private applyUserIdCriteria(userId?: string): (query: Knex.QueryBuilder) => void {

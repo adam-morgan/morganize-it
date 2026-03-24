@@ -13,7 +13,7 @@ export class AuthenticatedReactiveRoutes<T extends Entity> extends ReactiveRoute
     super(svc);
   }
 
-  public override find(req: HttpRequest<FindOptions>): Observable<HttpResponse<T[] | ApiError>> {
+  public override find(req: HttpRequest<FindOptions>): Observable<HttpResponse<PageResult<T> | ApiError>> {
     if (!req.userId) {
       return of({ status: 401, body: { message: "Unauthorized" } });
     }

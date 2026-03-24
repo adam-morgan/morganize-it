@@ -1,11 +1,28 @@
 import { Knex } from "knex";
 import { getKnex } from "./knex";
 
-export const buildQuery = (
+export type QueryResult<T> = {
+  query: Knex.QueryBuilder;
+  toPageResult: (rows: T[]) => PageResult<T>;
+};
+
+export const decodeCursor = (cursor: string): Record<string, FilterLiteral> => {
+  return JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+};
+
+export const encodeCursor = <T>(row: T, sortFields: string[]): string => {
+  const values: Record<string, unknown> = {};
+  for (const field of sortFields) {
+    values[field] = (row as Record<string, unknown>)[field];
+  }
+  return Buffer.from(JSON.stringify(values), "utf8").toString("base64url");
+};
+
+export const buildQuery = <T extends Entity>(
   table: string,
   findOptions?: FindOptions,
   queryFn?: (query: Knex.QueryBuilder) => void
-) => {
+): QueryResult<T> => {
   const knex = getKnex();
   const query: Knex.QueryBuilder = knex(table);
 
@@ -72,19 +89,63 @@ export const buildQuery = (
     applyCriteria(query, findOptions.criteria);
   }
 
+  // Build sort fields — always include "id" as tiebreaker for deterministic ordering
+  const sortFields: string[] = [];
+  const sortDirections: ("asc" | "desc")[] = [];
+
   if (findOptions?.sort != null) {
-    findOptions?.sort.forEach((sort) => {
+    findOptions.sort.forEach((sort) => {
+      sortFields.push(sort.property);
+      sortDirections.push(sort.direction);
       query.orderBy(sort.property, sort.direction);
     });
   }
 
-  if (findOptions?.offset != null) {
-    query.offset(findOptions.offset);
+  if (!sortFields.includes("id")) {
+    sortFields.push("id");
+    sortDirections.push("asc");
+    query.orderBy("id", "asc");
   }
 
-  if (findOptions?.limit != null) {
-    query.limit(findOptions.limit);
+  // Apply cursor-based keyset pagination
+  if (findOptions?.cursor != null) {
+    const cursorValues = decodeCursor(findOptions.cursor);
+
+    query.andWhere((sub: any) => {
+      // For keyset pagination with multiple sort fields, build a row-value comparison.
+      // For (a, b) > (va, vb): (a > va) OR (a = va AND b > vb)
+      for (let i = 0; i < sortFields.length; i++) {
+        const field = sortFields[i];
+        const direction = sortDirections[i];
+        const op = direction === "desc" ? "<" : ">";
+
+        sub.orWhere((inner: any) => {
+          for (let j = 0; j < i; j++) {
+            inner.andWhere(sortFields[j], cursorValues[sortFields[j]]);
+          }
+          inner.andWhere(field, op, cursorValues[field]);
+        });
+      }
+    });
   }
 
-  return query;
+  // Fetch limit + 1 to detect next page
+  const limit = findOptions?.limit;
+  if (limit != null) {
+    query.limit(limit + 1);
+  }
+
+  const toPageResult = (rows: T[]): PageResult<T> => {
+    if (limit != null && rows.length > limit) {
+      const items = rows.slice(0, limit);
+      const lastItem = items[items.length - 1];
+      return {
+        items,
+        nextCursor: encodeCursor(lastItem, sortFields),
+      };
+    }
+    return { items: rows };
+  };
+
+  return { query, toPageResult };
 };

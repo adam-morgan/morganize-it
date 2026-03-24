@@ -16,10 +16,10 @@ export class UserEntityPermissionResolver<T extends UserEntity> implements Permi
     }
 
     return this.reactiveService.find({ criteria: { id: entity.id } }).pipe(
-      switchMap((results) =>
-        results.length === 0
+      switchMap((result) =>
+        result.items.length === 0
           ? throwError(() => new NotFoundError("Record not found"))
-          : of(results[0])
+          : of(result.items[0])
       ),
       map((e) => e.userId === userId)
     );
@@ -27,10 +27,10 @@ export class UserEntityPermissionResolver<T extends UserEntity> implements Permi
 
   canDelete(userId: string, entityId: string): Observable<boolean> {
     return this.reactiveService.find({ criteria: { id: entityId } }).pipe(
-      switchMap((results) =>
-        results.length === 0
+      switchMap((result) =>
+        result.items.length === 0
           ? throwError(() => new NotFoundError("Record not found"))
-          : of(results[0])
+          : of(result.items[0])
       ),
       map((e) => e.userId === userId)
     );
