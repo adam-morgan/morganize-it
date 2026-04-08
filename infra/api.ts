@@ -3,6 +3,7 @@ import { usersTable, notebooksTable, notesTable } from "./storage";
 
 export const jwtSecret = new sst.Secret("JwtSecret");
 export const googleClientId = new sst.Secret("GoogleClientId");
+export const allowedEmails = new sst.Secret("AllowedEmails");
 
 const handlerBase = "src/server/lambda/handlers";
 
@@ -27,7 +28,10 @@ const nodejs = {
 
 export const api = new sst.aws.ApiGatewayV2("MorganizeItApi", {
   cors: {
-    allowOrigins: ["*"],
+    allowOrigins:
+      $app.stage === "prod"
+        ? ["https://notes.adammorgan.ca"]
+        : ["http://localhost:5173"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   },
@@ -39,6 +43,36 @@ export const api = new sst.aws.ApiGatewayV2("MorganizeItApi", {
           cert: "REPLACE_WITH_ACM_CERT_ARN_CA_CENTRAL_1",
         }
       : undefined,
+  transform: {
+    stage: {
+      routeSettings: [
+        {
+          routeKey: "POST /auth/login",
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+        {
+          routeKey: "POST /auth/create-account",
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+        {
+          routeKey: "POST /auth/google",
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+        {
+          routeKey: "POST /auth/refresh",
+          throttlingBurstLimit: 10,
+          throttlingRateLimit: 5,
+        },
+      ],
+      defaultRouteSettings: {
+        throttlingBurstLimit: 50,
+        throttlingRateLimit: 25,
+      },
+    },
+  },
 });
 
 const defaultEnv = {
@@ -55,14 +89,28 @@ api.route("POST /auth/login", {
 
 api.route("POST /auth/create-account", {
   handler: `${handlerBase}/auth/create-account.handler`,
-  link: [usersTable, jwtSecret],
+  link: [usersTable, jwtSecret, allowedEmails],
   environment: defaultEnv,
   nodejs,
 });
 
 api.route("POST /auth/google", {
   handler: `${handlerBase}/auth/google-login.handler`,
-  link: [usersTable, jwtSecret, googleClientId],
+  link: [usersTable, jwtSecret, googleClientId, allowedEmails],
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("POST /auth/refresh", {
+  handler: `${handlerBase}/auth/refresh.handler`,
+  link: [usersTable, jwtSecret],
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("POST /auth/logout", {
+  handler: `${handlerBase}/auth/logout.handler`,
+  link: [usersTable, jwtSecret],
   environment: defaultEnv,
   nodejs,
 });
@@ -126,6 +174,13 @@ api.route("DELETE /notebooks/{id}", {
   nodejs,
 });
 
+api.route("DELETE /notebooks/{id}/permanent", {
+  handler: `${handlerBase}/notebooks/permanent-delete.handler`,
+  link: [...notebookLinks, notesTable],
+  environment: defaultEnv,
+  nodejs,
+});
+
 // Note routes
 const noteLinks = [notesTable, jwtSecret];
 
@@ -173,6 +228,13 @@ api.route("PATCH /notes/{id}", {
 
 api.route("DELETE /notes/{id}", {
   handler: `${handlerBase}/notes/delete.handler`,
+  link: noteLinks,
+  environment: defaultEnv,
+  nodejs,
+});
+
+api.route("DELETE /notes/{id}/permanent", {
+  handler: `${handlerBase}/notes/permanent-delete.handler`,
   link: noteLinks,
   environment: defaultEnv,
   nodejs,

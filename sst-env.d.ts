@@ -6,6 +6,10 @@
 
 declare module "sst" {
   export interface Resource {
+    "AllowedEmails": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "GoogleClientId": {
       "type": "sst.sst.Secret"
       "value": string
