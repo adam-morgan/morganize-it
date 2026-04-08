@@ -25,7 +25,7 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    port: 9000,
+    port: 5173,
   },
   build: {
     outDir: "../.local/vite/dist",
