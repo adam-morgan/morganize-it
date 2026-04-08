@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { getAuthService } from "./services/auth-service";
 import { useNotebooksSlice } from "../notes/notebooksSlice";
+import { useNotesSlice } from "../notes/notesSlice";
+import { useRecentNotesSlice } from "../notes/recentNotesSlice";
+import { useTrashSlice } from "../notes/trashSlice";
+import { clearCache } from "../notes/services/cache-db";
 import { migrateLocalDataToServer } from "../notes/services/migration";
 import { map, Observable, of, switchMap, take, tap } from "rxjs";
 
@@ -14,7 +18,7 @@ type AuthSlice = {
   logout: () => Observable<void>;
 };
 
-export const useAuthSlice = create<AuthSlice>((set) => ({
+export const useAuthSlice = create<AuthSlice>((set, get) => ({
   user: undefined,
   setUser: (user) => set({ user }),
   login: (email, password) =>
@@ -60,11 +64,22 @@ export const useAuthSlice = create<AuthSlice>((set) => ({
         tap((user) => set({ user })),
         map(() => undefined)
       ),
-  logout: () =>
-    getAuthService()
+  logout: () => {
+    const userId = get().user?.id;
+    return getAuthService()
       .doLogout()
       .pipe(
         take(1),
-        tap(() => set({ user: undefined }))
-      ),
+        tap(() => {
+          set({ user: undefined });
+          useNotebooksSlice.getState().reset();
+          useNotesSlice.getState().reset();
+          useRecentNotesSlice.getState().reset();
+          useTrashSlice.getState().reset();
+          if (userId) {
+            clearCache(userId).catch(() => {});
+          }
+        })
+      );
+  },
 }));

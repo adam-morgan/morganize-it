@@ -1,4 +1,4 @@
-import { LoginCard } from "@/components";
+import { BrandLogo, LoginCard } from "@/components";
 import { useNavigate } from "react-router";
 import { take, tap } from "rxjs";
 import { useAuthSlice } from "../authSlice";
@@ -29,6 +29,7 @@ const LoginContainer = () => {
 
   return (
     <StyledLoginContainer>
+      <BrandLogo size="lg" layout="column" className="mb-8" />
       <LoginCard signIn={_login} googleLogin={_googleLogin} continueAsGuest={_continueAsGuest} />
     </StyledLoginContainer>
   );

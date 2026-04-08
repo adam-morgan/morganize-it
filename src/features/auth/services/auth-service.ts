@@ -1,5 +1,14 @@
-import { apiGet, apiPost, setAuthToken } from "@/utils/fetch";
+import { apiGet, apiPost, setAuthToken, setRefreshToken } from "@/utils/fetch";
 import { catchError, map, Observable, of, tap } from "rxjs";
+
+const storeTokens = (response: { token?: string; refreshToken?: string }) => {
+  if (response.token) {
+    setAuthToken(response.token);
+  }
+  if (response.refreshToken) {
+    setRefreshToken(response.refreshToken);
+  }
+};
 
 class AuthService {
   public getUser(): Observable<User | undefined> {
@@ -8,8 +17,7 @@ class AuthService {
       return of({ id: "0", name: "Guest", email: "", isGuest: true } as GuestUser);
     }
 
-    return apiGet<User | {}>("/auth/whoami").pipe(
-      map((user) => ((user as User).id ? (user as User) : undefined)),
+    return apiGet<User>("/auth/whoami").pipe(
       catchError(() => of(undefined))
     );
   }
@@ -23,26 +31,37 @@ class AuthService {
     return apiPost<LoginRequest, LoginResponse>("/auth/login", { email, password }).pipe(
       tap((response) => {
         localStorage.removeItem("guestMode");
-        if (response.token) {
-          setAuthToken(response.token);
-        }
+        storeTokens(response);
       })
     );
   }
 
   public doLogout(): Observable<void> {
-    setAuthToken(null);
-    localStorage.removeItem("guestMode");
-    return of(undefined);
+    const isGuest = localStorage.getItem("guestMode") === "true";
+
+    const clearLocal = () => {
+      setAuthToken(null);
+      setRefreshToken(null);
+      localStorage.removeItem("guestMode");
+    };
+
+    if (isGuest) {
+      clearLocal();
+      return of(undefined);
+    }
+
+    return apiPost<void, void>("/auth/logout", undefined as unknown as void).pipe(
+      catchError(() => of(undefined as unknown as void)),
+      tap(() => clearLocal()),
+      map(() => undefined),
+    );
   }
 
   public doGoogleLogin(credential: string): Observable<GoogleLoginResponse> {
     return apiPost<GoogleLoginRequest, GoogleLoginResponse>("/auth/google", { credential }).pipe(
       tap((response) => {
         localStorage.removeItem("guestMode");
-        if (response.token) {
-          setAuthToken(response.token);
-        }
+        storeTokens(response);
       })
     );
   }
@@ -54,9 +73,7 @@ class AuthService {
     }).pipe(
       tap((response) => {
         localStorage.removeItem("guestMode");
-        if (response.token) {
-          setAuthToken(response.token);
-        }
+        storeTokens(response);
       })
     );
   }

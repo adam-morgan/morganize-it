@@ -1,4 +1,4 @@
-import { CreateAccountCard } from "@/components";
+import { BrandLogo, CreateAccountCard } from "@/components";
 import { useNavigate } from "react-router";
 import { StyledLoginContainer } from "./LoginContainer";
 import { tap } from "rxjs";
@@ -14,6 +14,7 @@ const CreateAccountContainer = () => {
 
   return (
     <StyledLoginContainer>
+      <BrandLogo size="lg" layout="column" className="mb-8" />
       <CreateAccountCard createAccount={doAccountCreation} cancel={() => navigate("/login")} />
     </StyledLoginContainer>
   );
