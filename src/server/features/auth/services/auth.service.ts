@@ -9,6 +9,7 @@ export interface AuthService {
   updateUser(user: User): Promise<User>;
   setUserPassword(id: string, password: string): Promise<User>;
   deleteUser(id: string): Promise<void>;
+  invalidateTokens(userId: string): Promise<void>;
 
   login(email: string, password: string): Promise<LoginResponse>;
 }
@@ -85,6 +86,12 @@ export abstract class AbstractAuthService implements AuthService {
     const updatedUser = await this._updateUser(userToUpdate);
 
     return R.omit(["password"], updatedUser);
+  }
+
+  async invalidateTokens(userId: string): Promise<void> {
+    const user = await this._getUser(userId);
+    if (!user) throw new Error("User not found");
+    await this._updateUser({ ...user, tokenInvalidBefore: new Date().toISOString() });
   }
 
   async login(email: string, password: string): Promise<LoginResponse> {

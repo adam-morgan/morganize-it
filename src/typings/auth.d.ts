@@ -2,6 +2,7 @@ interface User extends Entity {
   name: string;
   email: string;
   password?: string;
+  tokenInvalidBefore?: string;
 }
 
 interface GuestUser extends User {
@@ -16,6 +17,7 @@ type LoginRequest = {
 type LoginResponse = {
   user: User;
   token?: string;
+  refreshToken?: string;
 };
 
 type CreateAccountRequest = {
@@ -26,6 +28,7 @@ type CreateAccountRequest = {
 type CreateAccountResponse = {
   user: User;
   token?: string;
+  refreshToken?: string;
 };
 
 type GoogleLoginRequest = {
@@ -35,5 +38,15 @@ type GoogleLoginRequest = {
 type GoogleLoginResponse = {
   user: User;
   token?: string;
+  refreshToken?: string;
   isNewUser: boolean;
+};
+
+type RefreshRequest = {
+  refreshToken: string;
+};
+
+type RefreshResponse = {
+  token: string;
+  refreshToken: string;
 };

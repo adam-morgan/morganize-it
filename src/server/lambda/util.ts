@@ -36,11 +36,19 @@ export const makeHttpRequestFromEvent = <T>(
   };
 };
 
+const securityHeaders = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-XSS-Protection": "0",
+};
+
 export const toLambdaResponse = <T>(response: HttpResponse<T>): APIGatewayProxyResultV2 => {
   const result: APIGatewayProxyResultV2 = {
     statusCode: response.status,
     headers: {
       "Content-Type": "application/json",
+      ...securityHeaders,
       ...(response.headers ?? {}),
     },
   };

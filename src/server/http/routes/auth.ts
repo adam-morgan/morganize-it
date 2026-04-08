@@ -4,19 +4,37 @@ import { HttpRequest } from "../request";
 import { HttpResponse } from "../response";
 import { error } from "@/server/logging";
 
+const getAllowedEmails = (): string | undefined => {
+  try {
+    const { Resource } = require("sst");
+    return Resource.AllowedEmails.value;
+  } catch {
+    return process.env.ALLOWED_EMAILS;
+  }
+};
+
+const isEmailAllowed = (email: string): boolean => {
+  const allowed = getAllowedEmails();
+  if (!allowed) return true;
+  return allowed
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .includes(email.toLowerCase());
+};
+
 export const whoami = async (
   req: HttpRequest<void>
-): Promise<HttpResponse<User | ApiError | {}>> => {
-  if (req.userId) {
-    try {
-      const user = await getAuthService().getUser(req.userId, false);
-      return { status: 200, body: user };
-    } catch (e) {
-      error((e as Error).message, e as Error);
-      return { status: 500, body: { message: "Internal Server Error" } };
-    }
-  } else {
-    return { status: 200, body: {} };
+): Promise<HttpResponse<User | ApiError>> => {
+  if (!req.userId) {
+    return { status: 401, body: { message: "Unauthorized" } };
+  }
+
+  try {
+    const user = await getAuthService().getUser(req.userId, false);
+    return { status: 200, body: user };
+  } catch (e) {
+    error((e as Error).message, e as Error);
+    return { status: 500, body: { message: "Internal Server Error" } };
   }
 };
 
@@ -46,6 +64,13 @@ export const createAccount = async (
     };
   }
 
+  if (!isEmailAllowed(req.body.email)) {
+    return {
+      status: 403,
+      body: { message: "Account registration is currently restricted" },
+    };
+  }
+
   const user: Omit<User, "id"> = {
     email: req.body.email,
     password: req.body.password,
@@ -54,6 +79,22 @@ export const createAccount = async (
 
   const createdUser = await authService.createUser(user);
   return { status: 201, body: { user: createdUser } };
+};
+
+export const logout = async (
+  req: HttpRequest<void>
+): Promise<HttpResponse<void | ApiError>> => {
+  if (!req.userId) {
+    return { status: 401, body: { message: "Unauthorized" } };
+  }
+
+  try {
+    await getAuthService().invalidateTokens(req.userId);
+    return { status: 200 };
+  } catch (e) {
+    error((e as Error).message, e as Error);
+    return { status: 500, body: { message: "Internal Server Error" } };
+  }
 };
 
 export const googleLogin = async (
@@ -67,6 +108,13 @@ export const googleLogin = async (
 
     if (existingUser) {
       return { status: 200, body: { user: existingUser, isNewUser: false } };
+    }
+
+    if (!isEmailAllowed(email)) {
+      return {
+        status: 403,
+        body: { message: "Account registration is currently restricted" },
+      };
     }
 
     const name = [givenName, familyName].filter(Boolean).join(" ") || email.split("@")[0];

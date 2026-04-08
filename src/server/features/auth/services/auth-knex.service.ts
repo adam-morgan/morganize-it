@@ -1,7 +1,7 @@
 import { getKnex } from "@/server/db";
 import { AbstractAuthService } from "./auth.service";
 
-const userColumns = ["id", "name", "email", "password"];
+const userColumns = ["id", "name", "email", "password", "tokenInvalidBefore"];
 
 export class AuthKnexService extends AbstractAuthService {
   async _getUser(id: string) {
