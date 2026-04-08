@@ -5,18 +5,20 @@ import { runGenericTests } from "../../util/reactive-tests";
 describe("NotebookService", () => {
   const svc = getNotebookService();
 
+  const now = new Date().toISOString();
+
   const testDef: ReactiveTestDef<Notebook> = {
     svc,
-    create: { name: "Test Notebook", userId: "user5" },
-    update: { name: "Test Notebook Updated", userId: "user5" },
+    create: { name: "Test Notebook", userId: "user5", updatedAt: expect.any(String) } as any,
+    update: { name: "Test Notebook Updated", userId: "user5", updatedAt: expect.any(String) } as any,
     patch: { name: "Test Notebook Patched " },
     writeRouteUser: { id: "user5", email: "user5@gmail.com", password: "password5" },
     readRouteUser: { id: "user1", email: "user1@gmail.com", password: "password1" },
     find: {
       records: [
-        { id: "1", name: "Test Notebook 1", userId: "user1" },
-        { id: "2", name: "Test Notebook 2", userId: "user1" },
-        { id: "3", name: "Test Notebook 3", userId: "user2" },
+        { id: "1", name: "Test Notebook 1", userId: "user1", updatedAt: now },
+        { id: "2", name: "Test Notebook 2", userId: "user1", updatedAt: now },
+        { id: "3", name: "Test Notebook 3", userId: "user2", updatedAt: now },
       ],
       queries: [
         {

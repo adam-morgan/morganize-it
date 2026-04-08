@@ -29,9 +29,10 @@ const _seedUsers = async (knex: Knex): Promise<void> => {
 };
 
 const _seedNotebooks = async (knex: Knex): Promise<void> => {
+  const now = new Date().toISOString();
   await knex("notebooks").insert([
-    { id: "notebook1", name: "Seed Notebook 1", userId: "user6" },
-    { id: "notebook2", name: "Seed Notebook 2", userId: "user6" },
-    { id: "notebook3", name: "Seed Notebook 3", userId: "user7" },
+    { id: "notebook1", name: "Seed Notebook 1", userId: "user6", updatedAt: now },
+    { id: "notebook2", name: "Seed Notebook 2", userId: "user6", updatedAt: now },
+    { id: "notebook3", name: "Seed Notebook 3", userId: "user7", updatedAt: now },
   ]);
 };

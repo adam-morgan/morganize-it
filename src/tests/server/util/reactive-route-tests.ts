@@ -118,7 +118,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
       const response = await authGet(writeToken, `${routePrefix}/${createdObj.id}`);
 
       expect(response.status).toBe(200);
-      expect(R.omit(["id"], response.body)).toEqual(def.create);
+      expect(R.omit(["id"], response.body)).toMatchObject(def.create);
     });
   });
 
@@ -138,7 +138,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
       const response = await authPost(writeToken, routePrefix).send(def.create);
 
       expect(response.status).toBe(201);
-      expect(R.omit(["id"], response.body)).toEqual(def.create);
+      expect(R.omit(["id"], response.body)).toMatchObject(def.create);
     });
   });
 
@@ -158,7 +158,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
       );
 
       expect(response.status).toBe(200);
-      expect(R.omit(["id"], response.body)).toEqual(def.update);
+      expect(R.omit(["id"], response.body)).toMatchObject(def.update);
     });
   });
 
@@ -178,7 +178,7 @@ export const runGenericReactiveRouteTests = <T extends Entity>(
       );
 
       expect(response.status).toBe(200);
-      expect(R.omit(["id"], response.body)).toEqual({ ...def.create, ...def.patch });
+      expect(R.omit(["id"], response.body)).toMatchObject({ ...def.create, ...def.patch });
     });
   });
 

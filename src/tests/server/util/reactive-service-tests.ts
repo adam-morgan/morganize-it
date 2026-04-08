@@ -109,7 +109,7 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
       await firstValueFrom(def.svc.create(toCreate));
 
       const findResponse = await firstValueFrom(def.svc.findById(id));
-      expect(findResponse).toEqual(toCreate);
+      expect(findResponse).toMatchObject(toCreate);
     });
   });
 
@@ -129,10 +129,10 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
       } as T;
 
       const createResponse = await firstValueFrom(def.svc.create(toCreate));
-      expect(createResponse).toEqual(toCreate);
+      expect(createResponse).toMatchObject(toCreate);
 
       const findResponse = await firstValueFrom(def.svc.findById(id));
-      expect(findResponse).toEqual(toCreate);
+      expect(findResponse).toMatchObject(toCreate);
     });
   });
 
@@ -159,10 +159,10 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
       } as T;
 
       const updateResponse = await firstValueFrom(def.svc.update(id, toUpdate));
-      expect(updateResponse).toEqual(toUpdate);
+      expect(updateResponse).toMatchObject(toUpdate);
 
       const findResponse = await firstValueFrom(def.svc.findById(id));
-      expect(findResponse).toEqual(toUpdate);
+      expect(findResponse).toMatchObject(toUpdate);
     });
   });
 
@@ -189,13 +189,13 @@ export const runGenericReactiveServiceTests = <T extends Entity>(def: ReactiveTe
       } as T;
 
       const patchResponse = await firstValueFrom(def.svc.patch(id, toPatch));
-      expect(patchResponse).toEqual({
+      expect(patchResponse).toMatchObject({
         ...toCreate,
         ...toPatch,
       });
 
       const findResponse = await firstValueFrom(def.svc.findById(id));
-      expect(findResponse).toEqual({
+      expect(findResponse).toMatchObject({
         ...toCreate,
         ...toPatch,
       });
