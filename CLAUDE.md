@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-npm run dev          # Start frontend (Vite :9000) + backend (Express :9001) concurrently
+npm run dev          # Start frontend (Vite :5173) + backend (Express :9001) concurrently
 npm run build        # Build both frontend & backend
 npm run start        # Run production Express server
 npm run test         # Run Jest tests (server-side only)
@@ -33,7 +33,7 @@ Tests use in-memory SQLite via `better-sqlite3` (configured in `.env.test`). Glo
 Layered architecture with RxJS Observables as the async primitive:
 
 - **HTTP Abstraction** (`server/http/`) — Decouples route handlers from Express/Lambda via `HttpRequest`/`HttpResponse` types. Generic `ReactiveRoutes` base class provides CRUD operations; `AuthenticatedReactiveRoutes` adds auth + permission checks.
-- **Features** (`server/features/`) — Business logic services (auth, notes). Services use a factory pattern to select Knex or DynamoDB implementations based on `DB_TYPE` env var.
+- **Features** (`server/features/`) — Business logic services (auth, notes/notebooks). Services use a factory pattern to select Knex or DynamoDB implementations based on `DB_TYPE` env var. Notes support tags and soft delete (trash).
 - **Database** (`server/db/`) — `AbstractReactiveService<T>` with two implementations:
   - `ReactiveKnexService` — SQL (PostgreSQL/SQLite) via Knex. Migrations in `server/db/sql/migrations/`.
   - `ReactiveDynamoService` — DynamoDB via AWS SDK v3. Query builder in `server/db/dynamo/query-builder.ts`.
@@ -50,19 +50,30 @@ Key flow (Lambda): API Gateway → Lambda handler → `withAuth()` → `Reactive
 
 SST (Ion) configuration for AWS deployment to `ca-central-1`:
 
-- **storage.ts** — DynamoDB table definitions (Users, Notebooks)
+- **storage.ts** — DynamoDB table definitions (Users, Notebooks, Notes)
 - **api.ts** — API Gateway v2 with individual Lambda handlers per route
 - **web.ts** — Static site hosting via S3/CloudFront
 - **dns.ts** — Custom domain configuration (notes.adammorgan.ca)
 
 ### Frontend (`src/`)
 
-- **State**: Zustand stores with RxJS-integrated slices (`features/auth/`, `features/notes/`)
-- **Routing**: Vite Pages plugin generates routes from `src/pages/` directory
+- **State**: Zustand stores with RxJS-integrated slices across features (`auth`, `notes`, `app`, `theme`). Slices include: `authSlice`, `mainAppSlice`, `alertSlice`, `maskSlice`, `notebooksSlice`, `notesSlice`, `recentNotesSlice`, `trashSlice`, `themeSlice`.
+- **Routing**: React Router v7 with lazy-loaded routes in `App.tsx`. Page components in `src/pages/`, nested app routes in `features/app/MainApp.tsx`.
 - **HTTP**: RxJS `fromFetch` wrapper (`src/utils/fetch.ts`) with JWT Bearer token in `Authorization` header
 - **Auth**: JWT tokens stored in localStorage (`setAuthToken`/`getAuthToken`)
 - **UI**: shadcn/ui components (Radix UI + Tailwind CSS v4). Component primitives in `src/components/ui/`. Dark/light mode via CSS class on `<html>`. `cn()` utility in `src/lib/utils.ts`.
+- **Rich Text Editor**: `novel` (Tiptap-based) for note editing in `NoteEditor.tsx`.
+- **Offline/Local Storage**: IndexedDB via `idb` package. `local-notes-service.ts` stores notes/notebooks locally, `cached-notes-service.ts` wraps local+API, `sync-manager.ts` syncs between IndexedDB and server, `migration.ts` migrates local data on first authenticated login.
+- **Custom Hooks** (`src/hooks/`): `useReactiveQuery` integrates RxJS Observables with React state; `useEffectOnMount` for one-time effects.
 - **Dev proxy**: Vite proxies `/api` requests to Express backend
+
+#### Feature directories
+
+- **`features/auth/`** — Login, account creation, auth state
+- **`features/notes/`** — Notebooks, notes, tags, trash, recent notes, search, note editor. Frontend services handle local caching, API calls, and sync.
+- **`features/app/`** — Main app layout, drawer state, alerts, loading mask
+- **`features/theme/`** — Dark/light theme, responsive breakpoints
+- **`features/profile/`** — Profile icon/menu
 
 ### Build Outputs
 
@@ -81,9 +92,11 @@ Tests live in `src/tests/server/` and use Jest + supertest for integration testi
 
 - `DB_TYPE` — `POSTGRESQL` (default) or `DYNAMODB`, selects database implementation
 - `JWT_SECRET` — Secret for signing/verifying JWT tokens (falls back to SST Resource binding in Lambda)
+- `GOOGLE_CLIENT_ID` — Google OAuth client ID for login
+- `DB_CLIENT` — Knex client override (e.g., `better-sqlite3` in `.env.test`)
 
 ## TypeScript
 
 - Strict mode enabled, path alias `@/` maps to `src/`
-- Type definitions in `src/typings/` (entity, auth, notes, find, error types)
+- Type definitions in `src/typings/` (entity, auth, notes, find, error, health, google, global types)
 - Separate `tsconfig.jest.json` for test compilation
