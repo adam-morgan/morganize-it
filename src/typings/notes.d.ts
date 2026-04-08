@@ -1,5 +1,7 @@
 interface Notebook extends UserEntity {
   name: string;
+  updatedAt: string;
+  deletedAt?: string | null;
 }
 
 interface Note extends UserEntity {
@@ -10,4 +12,6 @@ interface Note extends UserEntity {
   createdAt: string;
   updatedAt: string;
   lastOpenedAt: string;
+  tags?: string[];
+  deletedAt?: string | null;
 }
