@@ -67,6 +67,7 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
         title,
         content: "",
         textContent: "",
+        tags: [],
         notebookId,
         userId: user!.id,
         createdAt: now,
