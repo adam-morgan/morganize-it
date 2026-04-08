@@ -1,24 +1,44 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { take } from "rxjs";
-import { Plus } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, X, ArrowUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNotesSlice, NoteSortOption } from "../notesSlice";
 import { useNotebooksSlice } from "../notebooksSlice";
 import { useMaskSlice } from "@/features/app";
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import NoteCard from "./NoteCard";
+import NoteListItem from "./NoteListItem";
 import CreateNote from "./CreateNote";
 import MoveNoteDialog from "./MoveNoteDialog";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
+import TagsDialog from "./TagsDialog";
+import { searchNotes } from "../search/search-utils";
+
+type ViewMode = "card" | "list";
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia("(max-width: 640px)").matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  return isMobile;
+};
 
 const sortOptions: { value: NoteSortOption; label: string }[] = [
   { value: "lastOpenedAt", label: "Last Opened" },
@@ -31,15 +51,21 @@ const sortOptions: { value: NoteSortOption; label: string }[] = [
 const NotebookView = () => {
   const { notebookId } = useParams<{ notebookId: string }>();
   const navigate = useNavigate();
-  const { loadNotes, getSortedNotes, sortBy, setSortBy, deleteNote, updateNote } =
+  const { notes: allNotesMap, loadNotes, getSortedNotes, sortBy, setSortBy, deleteNote, updateNote } =
     useNotesSlice();
   const { notebooks } = useNotebooksSlice();
   const { mask } = useMaskSlice();
   const reactiveQuery = useReactiveQueryWithMask();
 
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [renameNote, setRenameNote] = useState<Note | null>(null);
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [tagsNote, setTagsNote] = useState<Note | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const effectiveViewMode = isMobile ? "list" : viewMode;
 
   const notebook = notebooks.find((nb) => nb.id === notebookId);
 
@@ -53,7 +79,13 @@ const NotebookView = () => {
     return null;
   }
 
-  const notes = getSortedNotes(notebookId);
+  const allNotes = getSortedNotes(notebookId);
+  const notes = searchQuery ? searchNotes(allNotes, searchQuery) : allNotes;
+  const allTags = [...new Set(Object.values(allNotesMap).flat().flatMap((n) => n.tags ?? []))];
+
+  const handleTagClick = (tag: string) => {
+    navigate(`/tags/${encodeURIComponent(tag)}`);
+  };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -76,28 +108,72 @@ const NotebookView = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center gap-3">
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as NoteSortOption)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-48 pl-9 pr-8"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="cursor-pointer" title="Sort notes">
+              <ArrowUpDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
             {sortOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
+              <DropdownMenuItem
+                key={opt.value}
+                onClick={() => setSortBy(opt.value)}
+                className="cursor-pointer"
+              >
+                <Check className={`mr-2 h-4 w-4 ${sortBy === opt.value ? "opacity-100" : "opacity-0"}`} />
                 {opt.label}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <CreateNote
           notebookId={notebookId}
           trigger={(open) => (
-            <Button onClick={open} size="sm">
+            <Button onClick={open} size="sm" className="cursor-pointer">
               <Plus className="mr-1 h-4 w-4" />
               New Note
             </Button>
           )}
         />
+        {!isMobile && (
+          <div className="ml-auto flex gap-1">
+            <Button
+              variant={effectiveViewMode === "card" ? "secondary" : "ghost"}
+              size="icon-sm"
+              className="cursor-pointer"
+              onClick={() => setViewMode("card")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={effectiveViewMode === "list" ? "secondary" : "ghost"}
+              size="icon-sm"
+              className="cursor-pointer"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {notes.length === 0 ? (
@@ -106,18 +182,39 @@ const NotebookView = () => {
           <p className="text-sm">Create a note to get started</p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-4">
-          {notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              onClick={() => handleNoteClick(note)}
-              onRename={() => setRenameNote(note)}
-              onMove={() => setMoveNote(note)}
-              onDelete={() => setDeleteTarget(note)}
-            />
-          ))}
-        </div>
+        effectiveViewMode === "card" ? (
+          <div className="flex flex-wrap gap-4">
+            {notes.map((note) => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                query={searchQuery || undefined}
+                onClick={() => handleNoteClick(note)}
+                onRename={() => setRenameNote(note)}
+                onMove={() => setMoveNote(note)}
+                onTags={() => setTagsNote(note)}
+                onTagClick={handleTagClick}
+                onDelete={() => setDeleteTarget(note)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y rounded-lg border">
+            {notes.map((note) => (
+              <NoteListItem
+                key={note.id}
+                note={note}
+                query={searchQuery || undefined}
+                onClick={() => handleNoteClick(note)}
+                onRename={() => setRenameNote(note)}
+                onMove={() => setMoveNote(note)}
+                onTags={() => setTagsNote(note)}
+                onTagClick={handleTagClick}
+                onDelete={() => setDeleteTarget(note)}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {renameNote && (
@@ -169,9 +266,32 @@ const NotebookView = () => {
       <DeleteConfirmDialog
         open={deleteTarget !== null}
         title="Delete Note"
-        message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? You can restore it from Trash.`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <TagsDialog
+        open={tagsNote !== null}
+        note={tagsNote}
+        allTags={allTags}
+        onSave={(tags) => {
+          if (!tagsNote) return;
+          const unmask = mask("Saving tags...");
+          updateNote(tagsNote.id, tagsNote.notebookId, { tags })
+            .pipe(take(1))
+            .subscribe({
+              complete: () => {
+                unmask();
+                setTagsNote(null);
+              },
+              error: () => {
+                unmask();
+                setTagsNote(null);
+              },
+            });
+        }}
+        onCancel={() => setTagsNote(null)}
       />
     </div>
   );

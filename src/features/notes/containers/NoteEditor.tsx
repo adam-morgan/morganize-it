@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { take } from "rxjs";
-import { useMaskSlice } from "@/features/app";
+import { useMaskSlice, useAlertSlice } from "@/features/app";
 import {
   EditorRoot,
   EditorContent,
@@ -30,6 +31,7 @@ import {
   ArrowLeft,
   MoreVertical,
   FolderInput,
+  Tag,
   Trash2,
   Bold,
   Italic,
@@ -58,6 +60,8 @@ import {
 import { useNotesSlice } from "../notesSlice";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import MoveNoteDialog from "./MoveNoteDialog";
+import TagsDialog from "./TagsDialog";
+import TagBadge from "../components/TagBadge";
 
 // --- Suggestion items (slash commands) ---
 
@@ -314,11 +318,15 @@ type NoteEditorProps = {
 };
 
 const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
-  const { updateNote, deleteNote } = useNotesSlice();
+  const navigate = useNavigate();
+  const { notes: allNotesMap, updateNote, deleteNote } = useNotesSlice();
   const { mask } = useMaskSlice();
   const [title, setTitle] = useState(note.title);
+  const [tags, setTags] = useState<string[]>(note.tags ?? []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [showTagsDialog, setShowTagsDialog] = useState(false);
+  const allTags = [...new Set(Object.values(allNotesMap).flat().flatMap((n) => n.tags ?? []))];
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -333,7 +341,9 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
           textContent: text,
         })
           .pipe(take(1))
-          .subscribe();
+          .subscribe({
+            error: () => useAlertSlice.getState().errorAlert("Failed to save note content"),
+          });
       }, 1500);
     },
     [note.id, note.notebookId, updateNote]
@@ -345,7 +355,9 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
       titleTimerRef.current = setTimeout(() => {
         updateNote(note.id, note.notebookId, { title: newTitle })
           .pipe(take(1))
-          .subscribe();
+          .subscribe({
+            error: () => useAlertSlice.getState().errorAlert("Failed to save note title"),
+          });
       }, 1500);
     },
     [note.id, note.notebookId, updateNote]
@@ -418,6 +430,10 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
               <FolderInput className="h-4 w-4" />
               Move to...
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShowTagsDialog(true)}>
+              <Tag className="h-4 w-4" />
+              Tags...
+            </DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onClick={() => setShowDeleteConfirm(true)}>
               <Trash2 className="h-4 w-4" />
               Delete
@@ -436,10 +452,41 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
       <DeleteConfirmDialog
         open={showDeleteConfirm}
         title="Delete Note"
-        message={`Are you sure you want to delete "${title}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${title}"? You can restore it from Trash.`}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
+
+      <TagsDialog
+        open={showTagsDialog}
+        note={{ ...note, tags }}
+        allTags={allTags}
+        onSave={(newTags) => {
+          const unmask = mask("Saving tags...");
+          updateNote(note.id, note.notebookId, { tags: newTags })
+            .pipe(take(1))
+            .subscribe({
+              complete: () => {
+                unmask();
+                setTags(newTags);
+                setShowTagsDialog(false);
+              },
+              error: () => {
+                unmask();
+                setShowTagsDialog(false);
+              },
+            });
+        }}
+        onCancel={() => setShowTagsDialog(false)}
+      />
+
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 border-b px-4 py-2">
+          {tags.map((tag) => (
+            <TagBadge key={tag} tag={tag} onClick={(t) => navigate(`/tags/${encodeURIComponent(t)}`)} />
+          ))}
+        </div>
+      )}
 
       <EditorRoot>
         <EditorContent
