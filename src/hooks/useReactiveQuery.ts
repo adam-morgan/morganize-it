@@ -16,6 +16,9 @@ export const useReactiveQuery =
       });
   };
 
+const MASK_DELAY_MS = 250;
+const MASK_MIN_VISIBLE_MS = 400;
+
 export const useReactiveQueryWithMask = () => {
   const { mask } = useMaskSlice();
   const { errorAlert } = useAlertSlice();
@@ -27,14 +30,38 @@ export const useReactiveQueryWithMask = () => {
     onError?: (error: any) => void,
     suppressErrorAlert?: boolean
   ) => {
-    const unmask = mask(maskText);
+    let completed = false;
+    let unmaskFn: (() => void) | null = null;
+    let maskShownAt = 0;
+
+    const delayTimer = setTimeout(() => {
+      if (!completed) {
+        unmaskFn = mask(maskText);
+        maskShownAt = Date.now();
+      }
+    }, MASK_DELAY_MS);
+
+    const cleanup = () => {
+      completed = true;
+      clearTimeout(delayTimer);
+
+      if (unmaskFn) {
+        const remaining = MASK_MIN_VISIBLE_MS - (Date.now() - maskShownAt);
+        if (remaining > 0) {
+          setTimeout(unmaskFn, remaining);
+        } else {
+          unmaskFn();
+        }
+      }
+    };
+
     fn()
       .pipe(take(1))
       .subscribe({
         next: callback,
-        complete: unmask,
+        complete: cleanup,
         error: (e) => {
-          unmask();
+          cleanup();
 
           if (!suppressErrorAlert) {
             errorAlert(e.message);

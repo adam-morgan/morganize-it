@@ -7,8 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
 import { CreateNotebook, useNotebooksSlice, useNotesSlice } from "../../notes";
-import { useEffectOnMount } from "@/hooks/useEffectOnMount";
 import { useState } from "react";
 import { take } from "rxjs";
 import { useMaskSlice } from "../maskSlice";
@@ -17,7 +17,7 @@ import DeleteConfirmDialog from "@/features/notes/containers/DeleteConfirmDialog
 import { useNavigate, useMatch } from "react-router-dom";
 
 const AppMenu = () => {
-  const { initialize, notebooks, updateNotebook, deleteNotebook } = useNotebooksSlice();
+  const { notebooks, updateNotebook, deleteNotebook } = useNotebooksSlice();
   const { expandedNotebookId, expandNotebook, loadNotes, notes } =
     useNotesSlice();
   const reactiveQuery = useReactiveQueryWithMask();
@@ -31,8 +31,6 @@ const AppMenu = () => {
 
   const [renameTarget, setRenameTarget] = useState<Notebook | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Notebook | null>(null);
-
-  useEffectOnMount(() => reactiveQuery(initialize, "Loading...", () => {}));
 
   const handleNotebookClick = (notebook: Notebook) => {
     navigate(`/notebooks/${notebook.id}`);
@@ -94,7 +92,7 @@ const AppMenu = () => {
       <ul className="py-2">
         <li>
           <button
-            className="w-full px-4 py-2 text-left text-sm hover:bg-accent"
+            className="w-full cursor-pointer px-4 py-2 text-left text-sm hover:bg-accent"
             onClick={() => navigate("/")}
           >
             Home
@@ -123,7 +121,7 @@ const AppMenu = () => {
             <li key={notebook.id}>
               <div
                 className={`group flex w-full items-center px-2 py-1.5 text-sm hover:bg-accent cursor-pointer ${
-                  isSelected ? "bg-accent" : ""
+                  isSelected ? "font-medium" : ""
                 }`}
                 onClick={() => handleNotebookClick(notebook)}
               >
@@ -164,7 +162,7 @@ const AppMenu = () => {
                 </DropdownMenu>
               </div>
               {isExpanded && (
-                <ul className="ml-4 border-l border-border">
+                <ul className="ml-4">
                   {notebookNotes.length === 0 ? (
                     <li className="px-4 py-1.5 text-xs text-muted-foreground italic">
                       No notes
@@ -173,8 +171,8 @@ const AppMenu = () => {
                     notebookNotes.slice(0, 10).map((note) => (
                       <li key={note.id}>
                         <button
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${
-                            currentNoteId === note.id ? "bg-accent" : ""
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs border-l-2 hover:bg-accent ${
+                            currentNoteId === note.id ? "border-primary" : "border-transparent"
                           }`}
                           onClick={() => handleNoteClick(note.id, notebook.id)}
                         >
@@ -196,6 +194,21 @@ const AppMenu = () => {
         })}
       </ul>
 
+      <div className="mt-4 px-4 py-2">
+        <Separator />
+      </div>
+      <ul>
+        <li>
+          <button
+            className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent text-muted-foreground"
+            onClick={() => navigate("/trash")}
+          >
+            <Trash2 className="h-4 w-4" />
+            Trash
+          </button>
+        </li>
+      </ul>
+
       {renameTarget && (
         <RenameDialog
           open={true}
@@ -209,7 +222,7 @@ const AppMenu = () => {
       <DeleteConfirmDialog
         open={deleteTarget !== null}
         title="Delete Notebook"
-        message={`Are you sure you want to delete "${deleteTarget?.name}"? All notes in this notebook will also be permanently deleted.`}
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? All notes in this notebook will also be deleted. You can restore them from Trash.`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
