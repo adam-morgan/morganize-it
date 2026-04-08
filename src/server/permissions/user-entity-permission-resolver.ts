@@ -11,7 +11,7 @@ export class UserEntityPermissionResolver<T extends UserEntity> implements Permi
   }
 
   canUpdate(userId: string, entity: T): Observable<boolean> {
-    if (entity.userId !== entity.userId) {
+    if (entity.userId && entity.userId !== userId) {
       return of(false);
     }
 
