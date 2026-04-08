@@ -42,7 +42,10 @@ const buildFilterExpression = (ctx: ExpressionContext, criteria: Criteria): stri
     const value = filterCriteria[property];
     const nameKey = nameRef(ctx, property);
 
-    if (value === null || typeof value !== "object") {
+    if (value === null) {
+      // Null means the attribute should not exist (or be null)
+      parts.push(`attribute_not_exists(${nameKey})`);
+    } else if (typeof value !== "object") {
       // Simple equality
       const placeholder = nextPlaceholder(ctx);
       ctx.values[placeholder] = value;

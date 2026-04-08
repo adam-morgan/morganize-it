@@ -31,6 +31,13 @@ export abstract class AbstractReactiveService<T extends Entity> implements React
   }
 
   patch(id: TableID, data: Partial<T>): Observable<T> {
-    return this.findById(id).pipe(switchMap((item) => this.update(id, { ...item, ...data })));
+    return this.find({ criteria: { id }, includeSoftDeleted: true }).pipe(
+      switchMap((result) =>
+        result.items.length === 0
+          ? throwError(() => new NotFoundError(`Not found: ${id}`))
+          : of(result.items[0])
+      ),
+      switchMap((item) => this.update(id, { ...item, ...data }))
+    );
   }
 }

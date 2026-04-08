@@ -11,15 +11,26 @@ export class UserEntityReactiveDynamoService<
   }
 
   override find(options?: FindOptions, userId?: string): Observable<PageResult<T>> {
-    if (userId) {
-      const criteriaWithUser: Criteria = options?.criteria
-        ? { $and: [{ userId }, options.criteria] }
-        : { userId };
+    const filters: Criteria[] = [];
 
-      return super.find({ ...options, criteria: criteriaWithUser });
+    if (userId) {
+      filters.push({ userId });
     }
 
-    return super.find(options);
+    if (options?.onlySoftDeleted) {
+      filters.push({ $not: { deletedAt: null } });
+    } else if (!options?.includeSoftDeleted) {
+      filters.push({ deletedAt: null });
+    }
+
+    if (options?.criteria) {
+      filters.push(options.criteria);
+    }
+
+    const mergedCriteria: Criteria | undefined =
+      filters.length > 1 ? { $and: filters } : filters[0];
+
+    return super.find({ ...options, criteria: mergedCriteria });
   }
 
   protected override buildKey(id: TableID): Record<string, unknown> {

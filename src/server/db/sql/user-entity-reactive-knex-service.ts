@@ -9,7 +9,14 @@ export class UserEntityReactiveKnexService<T extends UserEntity> extends Reactiv
   }
 
   override find(options?: FindOptions, userId?: string): Observable<PageResult<T>> {
-    const { query, toPageResult } = buildQuery<T>(this.table, options, this.applyUserIdCriteria(userId));
+    const { query, toPageResult } = buildQuery<T>(this.table, options, (q) => {
+      this.applyUserIdCriteria(userId)(q);
+      if (options?.onlySoftDeleted) {
+        q.whereNotNull("deletedAt");
+      } else if (!options?.includeSoftDeleted) {
+        q.whereNull("deletedAt");
+      }
+    });
     return from(query.select(this.columns).then((rows) => toPageResult(rows as T[])));
   }
 

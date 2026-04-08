@@ -3,6 +3,8 @@ type FindOptions = {
   sort?: Sort[];
   limit?: number;
   cursor?: string;
+  includeSoftDeleted?: boolean;
+  onlySoftDeleted?: boolean;
 };
 
 type PageResult<T> = {
