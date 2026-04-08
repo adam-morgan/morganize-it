@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { useAuthSlice } from "../auth";
-import { getNotesService } from "./services";
-import { map, Observable, of, take, tap } from "rxjs";
+import { getNotesService, getSyncManager } from "./services";
+import { map, Observable, of, switchMap, take, tap } from "rxjs";
+import { useNotesSlice } from "./notesSlice";
+import { SyncResult } from "./services/sync-manager";
 
 type NotebooksSlice = {
   initialized: boolean;
@@ -11,6 +13,29 @@ type NotebooksSlice = {
   updateNotebook: (id: string, name: string) => Observable<Notebook>;
   deleteNotebook: (id: string) => Observable<void>;
   reset: () => void;
+};
+
+const applySyncResult = (result: SyncResult) => {
+  useNotebooksSlice.setState({ notebooks: result.notebooks });
+
+  // Update notes slice for any notebookIds currently loaded in state
+  const notesState = useNotesSlice.getState();
+  const notesByNotebook: Record<string, Note[]> = {};
+  for (const note of result.notes) {
+    if (!notesByNotebook[note.notebookId]) {
+      notesByNotebook[note.notebookId] = [];
+    }
+    notesByNotebook[note.notebookId].push(note);
+  }
+
+  // Update loaded notebook note lists; also update notebooks that are now empty
+  const updatedNotes = { ...notesState.notes };
+  for (const notebookId of Object.keys(updatedNotes)) {
+    if (notesByNotebook[notebookId] != null) {
+      updatedNotes[notebookId] = notesByNotebook[notebookId];
+    }
+  }
+  useNotesSlice.setState({ notes: updatedNotes });
 };
 
 export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
@@ -24,11 +49,50 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
 
     const user = useAuthSlice.getState().user;
     const notesSvc = getNotesService(user as User);
+    const syncManager = getSyncManager(user as User);
 
-    return notesSvc.getNotebooks().pipe(
+    if (!syncManager) {
+      // Guest mode — just load from local IDB
+      return notesSvc.getNotebooks().pipe(
+        take(1),
+        tap((notebooks) => set({ notebooks, initialized: true })),
+        map(() => undefined)
+      );
+    }
+
+    // Authenticated: check for cache, then sync
+    return syncManager.hasCache().pipe(
       take(1),
-      tap((notebooks) => set({ notebooks, initialized: true })),
-      map(() => undefined)
+      switchMap((hasCache) => {
+        if (hasCache) {
+          // Load from IDB immediately, then sync in background
+          return notesSvc.getNotebooks().pipe(
+            take(1),
+            tap((notebooks) => set({ notebooks, initialized: true })),
+            tap(() => {
+              // Background sync — fire and forget
+              syncManager
+                .sync()
+                .pipe(take(1))
+                .subscribe({
+                  next: (result) => applySyncResult(result),
+                  error: (err) => console.warn("Background sync failed:", err),
+                });
+            }),
+            map(() => undefined)
+          );
+        } else {
+          // Cold start — full sync with loading indicator
+          return syncManager.sync().pipe(
+            take(1),
+            tap((result) => {
+              applySyncResult(result);
+              set({ initialized: true });
+            }),
+            map(() => undefined)
+          );
+        }
+      })
     );
   },
   createNotebook: (name) => {

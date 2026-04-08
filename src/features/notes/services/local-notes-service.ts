@@ -28,7 +28,7 @@ export class LocalNotesService implements NotesService {
   }
 
   public createNotebook(name: string): Observable<Notebook> {
-    const notebook: Notebook = { id: uuid(), name, userId: "" };
+    const notebook: Notebook = { id: uuid(), name, userId: "", updatedAt: new Date().toISOString() };
 
     return from(this.getDb()).pipe(
       switchMap((db) => from(db.add("notebooks", notebook))),
