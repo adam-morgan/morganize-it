@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { apiPost, apiPatch, apiDelete } from "@/utils/fetch";
-import { map, Observable, tap } from "rxjs";
+import { map, Observable, switchMap, tap } from "rxjs";
 
 type TrashSlice = {
   deletedNotebooks: Notebook[];
@@ -45,10 +45,22 @@ export const useTrashSlice = create<TrashSlice>((set, get) => ({
   },
 
   restoreNote: (id: string) => {
+    const note = get().deletedNotes.find((n) => n.id === id);
+    const notebookDeleted = note && get().deletedNotebooks.some((nb) => nb.id === note.notebookId);
+
     return apiPatch<Partial<Note>, Note>(`/notes/${id}`, { deletedAt: null } as Partial<Note>).pipe(
+      switchMap(() => {
+        if (notebookDeleted) {
+          return apiPatch<Partial<Notebook>, Notebook>(`/notebooks/${note.notebookId}`, { deletedAt: null } as Partial<Notebook>);
+        }
+        return new Observable<void>((s) => { s.next(); s.complete(); });
+      }),
       tap(() =>
         set((state) => ({
           deletedNotes: state.deletedNotes.filter((n) => n.id !== id),
+          ...(notebookDeleted && {
+            deletedNotebooks: state.deletedNotebooks.filter((nb) => nb.id !== note.notebookId),
+          }),
         }))
       ),
       map(() => undefined)

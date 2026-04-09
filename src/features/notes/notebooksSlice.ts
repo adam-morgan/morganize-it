@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useAuthSlice } from "../auth";
 import { getNotesService, getSyncManager } from "./services";
-import { map, Observable, of, switchMap, take, tap } from "rxjs";
+import { catchError, map, Observable, of, switchMap, take, tap, throwError } from "rxjs";
 import { useNotesSlice } from "./notesSlice";
 import { SyncResult } from "./services/sync-manager";
 
@@ -122,13 +122,14 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
     const user = useAuthSlice.getState().user;
     const notesSvc = getNotesService(user as User);
 
+    const previous = get().notebooks;
+    set({ notebooks: previous.filter((nb) => nb.id !== id) });
+
     return notesSvc.deleteNotebook(id).pipe(
-      tap(() =>
-        set((state) => ({
-          ...state,
-          notebooks: state.notebooks.filter((nb) => nb.id !== id),
-        }))
-      )
+      catchError((err) => {
+        set({ notebooks: previous });
+        return throwError(() => err);
+      })
     );
   },
 }));
