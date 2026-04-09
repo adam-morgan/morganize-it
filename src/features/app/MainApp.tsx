@@ -1,6 +1,7 @@
 import AppBar from "@/components/app-bar/AppBar";
 import BrandLogo from "@/components/brand/BrandLogo";
 import Drawer from "@/components/drawer/Drawer";
+import { useAppSync } from "@/hooks/useAppSync";
 import { useEffectOnMount } from "@/hooks/useEffectOnMount";
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import { useState, useEffect } from "react";
@@ -52,6 +53,8 @@ const MainApp = () => {
   const tagMatch = useMatch("/tags/:tagName");
   const tagName = tagMatch?.params.tagName ? decodeURIComponent(tagMatch.params.tagName) : null;
   const trashMatch = useMatch("/trash");
+
+  useAppSync();
 
   useEffectOnMount(() => {
     initialize(breakpoint);

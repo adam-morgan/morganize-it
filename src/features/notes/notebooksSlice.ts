@@ -3,12 +3,14 @@ import { useAuthSlice } from "../auth";
 import { getNotesService, getSyncManager } from "./services";
 import { catchError, map, Observable, of, switchMap, take, tap, throwError } from "rxjs";
 import { useNotesSlice } from "./notesSlice";
+import { useRecentNotesSlice } from "./recentNotesSlice";
 import { SyncResult } from "./services/sync-manager";
 
 type NotebooksSlice = {
   initialized: boolean;
   notebooks: Notebook[];
   initialize: () => Observable<void>;
+  resync: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
   updateNotebook: (id: string, name: string) => Observable<Notebook>;
   deleteNotebook: (id: string) => Observable<void>;
@@ -36,12 +38,30 @@ const applySyncResult = (result: SyncResult) => {
     }
   }
   useNotesSlice.setState({ notes: updatedNotes });
+  useRecentNotesSlice.getState().reset();
 };
 
 export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
   initialized: false,
   notebooks: [],
   reset: () => set({ initialized: false, notebooks: [] }),
+  resync: () => {
+    const user = useAuthSlice.getState().user;
+    if (!user || (user as GuestUser).isGuest) {
+      return of(undefined);
+    }
+
+    const syncManager = getSyncManager(user as User);
+    if (!syncManager) {
+      return of(undefined);
+    }
+
+    return syncManager.sync().pipe(
+      take(1),
+      tap((result) => applySyncResult(result)),
+      map(() => undefined)
+    );
+  },
   initialize: () => {
     if (get().initialized) {
       return of(undefined);
