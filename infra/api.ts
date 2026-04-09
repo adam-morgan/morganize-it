@@ -29,9 +29,7 @@ const nodejs = {
 export const api = new sst.aws.ApiGatewayV2("MorganizeItApi", {
   cors: {
     allowOrigins:
-      $app.stage === "prod"
-        ? ["https://notes.adammorgan.ca"]
-        : ["http://localhost:5173"],
+      $app.stage === "prod" ? ["https://notes.adammorgan.ca"] : ["http://localhost:5173"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   },
@@ -40,33 +38,11 @@ export const api = new sst.aws.ApiGatewayV2("MorganizeItApi", {
       ? {
           dns: false,
           name: "api.notes.adammorgan.ca",
-          cert: "REPLACE_WITH_ACM_CERT_ARN_CA_CENTRAL_1",
+          cert: "arn:aws:acm:ca-central-1:499854674714:certificate/7c21edc8-636c-455c-aa9c-28506ae2c45e",
         }
       : undefined,
   transform: {
     stage: {
-      routeSettings: [
-        {
-          routeKey: "POST /auth/login",
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
-        },
-        {
-          routeKey: "POST /auth/create-account",
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
-        },
-        {
-          routeKey: "POST /auth/google",
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
-        },
-        {
-          routeKey: "POST /auth/refresh",
-          throttlingBurstLimit: 10,
-          throttlingRateLimit: 5,
-        },
-      ],
       defaultRouteSettings: {
         throttlingBurstLimit: 50,
         throttlingRateLimit: 25,

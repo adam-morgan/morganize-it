@@ -15,7 +15,7 @@ export const web = new sst.aws.StaticSite("MorganizeItWeb", {
       ? {
           dns: false,
           name: "notes.adammorgan.ca",
-          cert: "REPLACE_WITH_ACM_CERT_ARN_US_EAST_1",
+          cert: "arn:aws:acm:us-east-1:499854674714:certificate/ef4cb41b-8c3e-4d5f-b377-323bb564a124",
         }
       : undefined,
   environment: {
