@@ -58,7 +58,14 @@ const NotebookView = () => {
   const reactiveQuery = useReactiveQueryWithMask();
 
   const isMobile = useIsMobile();
-  const [viewMode, setViewMode] = useState<ViewMode>("card");
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    const stored = localStorage.getItem("viewMode");
+    return stored === "list" ? "list" : "card";
+  });
+  const setViewMode = (mode: ViewMode) => {
+    localStorage.setItem("viewMode", mode);
+    setViewModeState(mode);
+  };
   const [renameNote, setRenameNote] = useState<Note | null>(null);
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
@@ -148,9 +155,8 @@ const NotebookView = () => {
         <CreateNote
           notebookId={notebookId}
           trigger={(open) => (
-            <Button onClick={open} size="sm" className="cursor-pointer">
-              <Plus className="mr-1 h-4 w-4" />
-              New Note
+            <Button onClick={open} size="icon-sm" className="cursor-pointer" title="New Note">
+              <Plus className="h-4 w-4" />
             </Button>
           )}
         />

@@ -20,6 +20,13 @@ type NotesSlice = {
   reset: () => void;
 };
 
+const validSortOptions: NoteSortOption[] = ["lastOpenedAt", "updatedAt", "createdAt", "titleAsc", "titleDesc"];
+
+const getStoredSortBy = (): NoteSortOption => {
+  const stored = localStorage.getItem("noteSortBy");
+  return validSortOptions.includes(stored as NoteSortOption) ? (stored as NoteSortOption) : "lastOpenedAt";
+};
+
 const sortNotes = (notes: Note[], sortBy: NoteSortOption): Note[] => {
   const sorted = [...notes];
   switch (sortBy) {
@@ -41,7 +48,7 @@ const sortNotes = (notes: Note[], sortBy: NoteSortOption): Note[] => {
 export const useNotesSlice = create<NotesSlice>((set, get) => ({
   notes: {},
   expandedNotebookId: null,
-  sortBy: "lastOpenedAt",
+  sortBy: getStoredSortBy(),
   loadNotes: (notebookId) => {
     const user = useAuthSlice.getState().user;
     const notesSvc = getNotesService(user as User);
@@ -145,7 +152,10 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
       )
     );
   },
-  setSortBy: (option) => set({ sortBy: option }),
+  setSortBy: (option) => {
+    localStorage.setItem("noteSortBy", option);
+    set({ sortBy: option });
+  },
   getSortedNotes: (notebookId) => {
     const state = get();
     return sortNotes(state.notes[notebookId] ?? [], state.sortBy);
