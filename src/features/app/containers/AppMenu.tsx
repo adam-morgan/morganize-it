@@ -112,7 +112,7 @@ const AppMenu = () => {
         </div>
       </div>
       <ul>
-        {(notebooks ?? []).map((notebook) => {
+        {(notebooks ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)).map((notebook) => {
           const isExpanded = expandedNotebookId === notebook.id;
           const isSelected = currentNotebookId === notebook.id;
           const notebookNotes = notes[notebook.id] ?? [];
@@ -141,7 +141,7 @@ const AppMenu = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
+                      className="h-6 w-6 shrink-0 md:opacity-0 md:group-hover:opacity-100"
                     >
                       <MoreVertical className="h-3.5 w-3.5" />
                     </Button>
