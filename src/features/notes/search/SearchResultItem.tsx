@@ -1,5 +1,6 @@
 import { HighlightedText, getSnippet, SnippetText } from "./search-utils";
 import { formatRelativeTime } from "../containers/NoteCard";
+import TagBadge from "../components/TagBadge";
 
 type SearchResultItemProps = {
   note: Note;
@@ -31,6 +32,16 @@ const SearchResultItem = ({
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {SnippetText({ snippet })}
         </p>
+      )}
+      {(note.tags ?? []).length > 0 && (
+        <div className="mt-0.5 flex flex-wrap gap-1">
+          {(note.tags ?? []).slice(0, 3).map((tag) => (
+            <TagBadge key={tag} tag={tag} query={query} />
+          ))}
+          {(note.tags ?? []).length > 3 && (
+            <span className="text-xs text-muted-foreground">+{(note.tags ?? []).length - 3}</span>
+          )}
+        </div>
       )}
       <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground/60">
         {notebookName && <span>{notebookName}</span>}

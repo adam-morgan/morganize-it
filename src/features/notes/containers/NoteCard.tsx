@@ -81,7 +81,7 @@ const NoteCard = ({ note, query, onClick, onRename, onMove, onTags, onTagClick, 
         {(note.tags ?? []).length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {(note.tags ?? []).slice(0, 3).map((tag) => (
-              <TagBadge key={tag} tag={tag} onClick={onTagClick} />
+              <TagBadge key={tag} tag={tag} query={query} onClick={onTagClick} />
             ))}
             {(note.tags ?? []).length > 3 && (
               <span className="text-xs text-muted-foreground">+{(note.tags ?? []).length - 3}</span>

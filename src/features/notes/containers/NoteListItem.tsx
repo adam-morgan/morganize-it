@@ -26,30 +26,32 @@ const NoteListItem = ({ note, query, onClick, onRename, onMove, onTags, onTagCli
 
   return (
     <div
-      className="flex cursor-pointer items-center gap-4 px-3 py-3 transition-colors hover:bg-accent/50"
+      className="flex cursor-pointer items-center gap-2 px-3 py-3 transition-colors hover:bg-accent/50"
       onClick={onClick}
     >
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {query ? HighlightedText({ text: note.title, query }) : note.title}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">
-          {snippet ? SnippetText({ snippet }) : (note.textContent || "Empty note")}
-        </p>
-      </div>
-      {(note.tags ?? []).length > 0 && (
-        <div className="flex shrink-0 gap-1">
-          {(note.tags ?? []).slice(0, 2).map((tag) => (
-            <TagBadge key={tag} tag={tag} onClick={onTagClick} />
-          ))}
-          {(note.tags ?? []).length > 2 && (
-            <span className="text-xs text-muted-foreground">+{(note.tags ?? []).length - 2}</span>
-          )}
+      <div className="min-w-0 flex-1 flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-1">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
+          <p className="truncate text-sm font-medium">
+            {query ? HighlightedText({ text: note.title, query }) : note.title}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {snippet ? SnippetText({ snippet }) : (note.textContent || "Empty note")}
+          </p>
         </div>
-      )}
-      <span className="shrink-0 text-xs text-muted-foreground/60">
-        {formatRelativeTime(note.updatedAt)}
-      </span>
+        {(note.tags ?? []).length > 0 && (
+          <div className="flex gap-1">
+            {(note.tags ?? []).slice(0, 2).map((tag) => (
+              <TagBadge key={tag} tag={tag} query={query} onClick={onTagClick} />
+            ))}
+            {(note.tags ?? []).length > 2 && (
+              <span className="text-xs text-muted-foreground">+{(note.tags ?? []).length - 2}</span>
+            )}
+          </div>
+        )}
+        <span className="shrink-0 text-xs text-muted-foreground/60">
+          {formatRelativeTime(note.updatedAt)}
+        </span>
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
           <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">

@@ -1,13 +1,15 @@
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { HighlightedText } from "../search/search-utils";
 
 type TagBadgeProps = {
   tag: string;
+  query?: string;
   onClick?: (tag: string) => void;
   onRemove?: (tag: string) => void;
 };
 
-const TagBadge = ({ tag, onClick, onRemove }: TagBadgeProps) => {
+const TagBadge = ({ tag, query, onClick, onRemove }: TagBadgeProps) => {
   return (
     <Badge
       variant="secondary"
@@ -17,7 +19,7 @@ const TagBadge = ({ tag, onClick, onRemove }: TagBadgeProps) => {
         onClick?.(tag);
       }}
     >
-      {tag}
+      {query ? HighlightedText({ text: tag, query }) : tag}
       {onRemove && (
         <button
           className="ml-0.5 rounded-full hover:bg-muted-foreground/20"
