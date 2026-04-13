@@ -32,12 +32,8 @@ const AppMenu = () => {
   const [renameTarget, setRenameTarget] = useState<Notebook | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Notebook | null>(null);
 
-  const handleNotebookClick = (notebook: Notebook) => {
+  const handleNotebookRowClick = (notebook: Notebook) => {
     navigate(`/notebooks/${notebook.id}`);
-  };
-
-  const handleExpandToggle = (e: React.MouseEvent, notebook: Notebook) => {
-    e.stopPropagation();
     if (expandedNotebookId === notebook.id) {
       expandNotebook(null);
     } else {
@@ -123,18 +119,15 @@ const AppMenu = () => {
                 className={`group flex w-full items-center px-2 py-1.5 text-sm hover:bg-accent cursor-pointer ${
                   isSelected ? "font-medium" : ""
                 }`}
-                onClick={() => handleNotebookClick(notebook)}
+                onClick={() => handleNotebookRowClick(notebook)}
               >
-                <button
-                  className="mr-1 shrink-0 p-0.5 hover:bg-accent-foreground/10 rounded"
-                  onClick={(e) => handleExpandToggle(e, notebook)}
-                >
+                <span className="mr-1 shrink-0 p-0.5 rounded">
                   {isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5" />
                   ) : (
                     <ChevronRight className="h-3.5 w-3.5" />
                   )}
-                </button>
+                </span>
                 <span className="flex-1 truncate">{notebook.name}</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
