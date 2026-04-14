@@ -17,6 +17,8 @@ import TagView from "../notes/containers/TagView";
 import TrashView from "../notes/containers/TrashView";
 import RecentNotes from "../notes/containers/RecentNotes";
 import GlobalSearchDialog from "../notes/search/GlobalSearchDialog";
+import { FriendsView, useFriendsSlice } from "../friends";
+import { useAuthSlice } from "../auth";
 import { Routes, Route, Link, useMatch } from "react-router-dom";
 
 const WelcomeView = () => (
@@ -53,12 +55,20 @@ const MainApp = () => {
   const tagMatch = useMatch("/tags/:tagName");
   const tagName = tagMatch?.params.tagName ? decodeURIComponent(tagMatch.params.tagName) : null;
   const trashMatch = useMatch("/trash");
+  const friendsMatch = useMatch("/friends");
+
+  const initializeFriends = useFriendsSlice((s) => s.initialize);
+  const user = useAuthSlice((s) => s.user);
+  const isGuest = (user as GuestUser | undefined)?.isGuest === true;
 
   useAppSync();
 
   useEffectOnMount(() => {
     initialize(breakpoint);
     reactiveQuery(initializeNotebooks, "Loading...", () => {});
+    if (!isGuest) {
+      initializeFriends().subscribe();
+    }
   });
 
   useEffect(() => {
@@ -89,13 +99,15 @@ const MainApp = () => {
 
   const showDrawerOffset = !mobileMode && drawerOpen;
   const selectedNotebook = notebooks.find((nb) => nb.id === notebookId);
-  const appBarTitle = trashMatch
-    ? "Trash"
-    : tagName
-      ? `Tag: ${tagName}`
-      : selectedNotebook
-        ? selectedNotebook.name
-        : "Home";
+  const appBarTitle = friendsMatch
+    ? "Friends"
+    : trashMatch
+      ? "Trash"
+      : tagName
+        ? `Tag: ${tagName}`
+        : selectedNotebook
+          ? selectedNotebook.name
+          : "Home";
 
   return (
     <>
@@ -137,6 +149,7 @@ const MainApp = () => {
           <Route path="/notebooks/:notebookId" element={<NotebookView />} />
           <Route path="/tags/:tagName" element={<TagView />} />
           <Route path="/trash" element={<TrashView />} />
+          <Route path="/friends" element={<FriendsView />} />
           <Route path="*" element={<WelcomeView />} />
         </Routes>
       </div>

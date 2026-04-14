@@ -16,6 +16,7 @@ import { useThemeSlice } from "../theme/themeSlice";
 import { useMaskSlice, useAlertSlice } from "../app";
 import { useNotebooksSlice } from "../notes/notebooksSlice";
 import { exportData, importData } from "../notes/services/export-service";
+import { useFriendsSlice } from "../friends";
 import { take } from "rxjs";
 
 type ProfileIconProps = {
@@ -30,7 +31,17 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
 
-  const ele = <Avatar user={user as User} />;
+  const incomingCount = useFriendsSlice((s) => s.incomingRequests.length);
+  const showBadge = withMenu && incomingCount > 0;
+
+  const ele = (
+    <div className="relative">
+      <Avatar user={user as User} />
+      {showBadge && (
+        <span className="absolute -right-0.5 -top-0.5 inline-block h-2.5 w-2.5 rounded-full bg-destructive ring-2 ring-background" />
+      )}
+    </div>
+  );
 
   const handleExport = () => {
     const unmask = mask("Exporting data...");
@@ -124,6 +135,18 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
             </DropdownMenuItem>
           ) : (
             <>
+              <DropdownMenuItem
+                onClick={() => navigate("/friends")}
+                className="flex items-center justify-between"
+              >
+                <span>Friends</span>
+                {incomingCount > 0 && (
+                  <span className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-medium text-destructive-foreground">
+                    {incomingCount}
+                  </span>
+                )}
+              </DropdownMenuItem>
+
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>Import/Export</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
