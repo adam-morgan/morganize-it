@@ -138,6 +138,38 @@
   cursor: pointer;
 }
 
+/* Tables */
+.novel-editor table.novel-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.novel-editor .novel-table td,
+.novel-editor .novel-table th {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  min-width: 80px;
+  position: relative;
+}
+
+.novel-editor .novel-table th {
+  background-color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+}
+
+.novel-editor .novel-table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--primary);
+  opacity: 0.08;
+  pointer-events: none;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
