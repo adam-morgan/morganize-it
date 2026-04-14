@@ -1,4 +1,4 @@
-import { api, googleClientId } from "./api";
+import { api, googleClientId, wsApi } from "./api";
 
 export const web = new sst.aws.StaticSite("MorganizeItWeb", {
   path: ".",
@@ -20,6 +20,7 @@ export const web = new sst.aws.StaticSite("MorganizeItWeb", {
       : undefined,
   environment: {
     VITE_API_URL: api.url,
+    VITE_WS_URL: wsApi.url,
     VITE_GOOGLE_CLIENT_ID: googleClientId.value,
   },
 });

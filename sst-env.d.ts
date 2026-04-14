@@ -10,6 +10,18 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "Attachments": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
+    "Connections": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "Friendships": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "GoogleClientId": {
       "type": "sst.sst.Secret"
       "value": string
@@ -34,9 +46,18 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "Shares": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "Users": {
       "name": string
       "type": "sst.aws.Dynamo"
+    }
+    "WsApi": {
+      "managementEndpoint": string
+      "type": "sst.aws.ApiGatewayWebSocket"
+      "url": string
     }
   }
 }
