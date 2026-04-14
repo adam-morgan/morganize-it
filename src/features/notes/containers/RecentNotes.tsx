@@ -6,6 +6,7 @@ import { useRecentNotesSlice } from "../recentNotesSlice";
 import { useNotebooksSlice } from "../notebooksSlice";
 import { useNotesSlice } from "../notesSlice";
 import { useMaskSlice } from "@/features/app";
+import { useAuthSlice } from "@/features/auth";
 import { formatRelativeTime } from "./NoteCard";
 import NoteListItem from "./NoteListItem";
 import RenameDialog from "./RenameDialog";
@@ -60,6 +61,7 @@ const RecentNotes = () => {
   const { notebooks } = useNotebooksSlice();
   const { updateNote, deleteNote } = useNotesSlice();
   const { mask } = useMaskSlice();
+  const myUserId = useAuthSlice((s) => s.user?.id);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -77,8 +79,9 @@ const RecentNotes = () => {
     }
   }, [loaded]);
 
-  const notebookName = (notebookId: string) =>
-    notebooks.find((nb) => nb.id === notebookId)?.name ?? "";
+  const notebookName = (notebookId: string) => {
+    return notebooks.find((nb) => nb.id === notebookId)?.name ?? "";
+  };
 
   const handleTagClick = (tag: string) => {
     navigate(`/tags/${encodeURIComponent(tag)}`);
@@ -187,18 +190,22 @@ const RecentNotes = () => {
       <h2 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">Recently Opened</h2>
       {isMobile ? (
         <div className="divide-y rounded-lg border">
-          {recentNotes.map((note) => (
-            <NoteListItem
-              key={note.id}
-              note={note}
-              onClick={() => navigate(`/notebooks/${note.notebookId}/notes/${note.id}`)}
-              onRename={() => setRenameNote(note)}
-              onMove={() => setMoveNote(note)}
-              onTags={() => setTagsNote(note)}
-              onTagClick={handleTagClick}
-              onDelete={() => setDeleteTarget(note)}
-            />
-          ))}
+          {recentNotes.map((note) => {
+            const owned = note.userId === myUserId;
+            const noteEditable = owned || (note as SyncNote).accessLevel === "readwrite";
+            return (
+              <NoteListItem
+                key={note.id}
+                note={note}
+                onClick={() => navigate(`/notebooks/${note.notebookId}/notes/${note.id}`)}
+                onRename={noteEditable ? () => setRenameNote(note) : undefined}
+                onMove={owned ? () => setMoveNote(note) : undefined}
+                onTags={noteEditable ? () => setTagsNote(note) : undefined}
+                onTagClick={handleTagClick}
+                onDelete={owned ? () => setDeleteTarget(note) : undefined}
+              />
+            );
+          })}
         </div>
       ) : (
         <div className="flex flex-wrap gap-4">

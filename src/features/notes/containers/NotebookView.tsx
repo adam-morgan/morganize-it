@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { take } from "rxjs";
-import { Plus, LayoutGrid, List, Search, X, ArrowUpDown, Check } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, X, ArrowUpDown, Check, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,7 @@ import {
 import { useNotesSlice, NoteSortOption } from "../notesSlice";
 import { useNotebooksSlice } from "../notebooksSlice";
 import { useMaskSlice } from "@/features/app";
+import { useAuthSlice } from "@/features/auth";
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import NoteCard from "./NoteCard";
 import NoteListItem from "./NoteListItem";
@@ -22,6 +23,13 @@ import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import RenameDialog from "./RenameDialog";
 import TagsDialog from "./TagsDialog";
 import { searchNotes } from "../search/search-utils";
+import {
+  DropdownMenu as ToolbarDropdownMenu,
+  DropdownMenuContent as ToolbarDropdownMenuContent,
+  DropdownMenuItem as ToolbarDropdownMenuItem,
+  DropdownMenuTrigger as ToolbarDropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ShareDialog } from "@/features/shares";
 
 type ViewMode = "card" | "list";
 
@@ -53,8 +61,9 @@ const NotebookView = () => {
   const navigate = useNavigate();
   const { notes: allNotesMap, loadNotes, getSortedNotes, sortBy, setSortBy, deleteNote, updateNote } =
     useNotesSlice();
-  const { notebooks } = useNotebooksSlice();
+  const { notebooks, updateNotebook, deleteNotebook } = useNotebooksSlice();
   const { mask } = useMaskSlice();
+  const myUserId = useAuthSlice((s) => s.user?.id);
   const reactiveQuery = useReactiveQueryWithMask();
 
   const isMobile = useIsMobile();
@@ -70,11 +79,21 @@ const NotebookView = () => {
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
   const [tagsNote, setTagsNote] = useState<Note | null>(null);
+  const [shareNote, setShareNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [renameNotebookOpen, setRenameNotebookOpen] = useState(false);
+  const [shareNotebookOpen, setShareNotebookOpen] = useState(false);
+  const [deleteNotebookOpen, setDeleteNotebookOpen] = useState(false);
 
   const effectiveViewMode = isMobile ? "list" : viewMode;
 
-  const notebook = notebooks.find((nb) => nb.id === notebookId);
+  const notebook = notebooks.find((nb) => nb.id === notebookId) as SyncNotebook | undefined;
+  const accessLevel: ShareAccessLevel = notebook?.accessLevel ?? "none";
+
+  const canEditNotebook = accessLevel === "owner" || accessLevel === "readwrite";
+  const canDeleteNotebook = accessLevel === "owner";
+  const canShareNotebook = accessLevel === "owner";
+  const canCreateNote = accessLevel === "owner" || accessLevel === "readwrite";
 
   useEffect(() => {
     if (notebookId) {
@@ -152,16 +171,18 @@ const NotebookView = () => {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <CreateNote
-          notebookId={notebookId}
-          trigger={(open) => (
-            <Button onClick={open} size="icon-sm" className="cursor-pointer" title="New Note">
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
-        />
+        {canCreateNote && (
+          <CreateNote
+            notebookId={notebookId}
+            trigger={(open) => (
+              <Button onClick={open} size="icon-sm" className="cursor-pointer" title="New Note">
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+          />
+        )}
         {!isMobile && (
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex items-center gap-1">
             <Button
               variant={effectiveViewMode === "card" ? "secondary" : "ghost"}
               size="icon-sm"
@@ -178,6 +199,38 @@ const NotebookView = () => {
             >
               <List className="h-4 w-4" />
             </Button>
+            {(canEditNotebook || canShareNotebook || canDeleteNotebook) && (
+              <ToolbarDropdownMenu>
+                <ToolbarDropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" className="cursor-pointer">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </ToolbarDropdownMenuTrigger>
+                <ToolbarDropdownMenuContent align="end">
+                  {canEditNotebook && (
+                    <ToolbarDropdownMenuItem onClick={() => setRenameNotebookOpen(true)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Rename
+                    </ToolbarDropdownMenuItem>
+                  )}
+                  {canShareNotebook && (
+                    <ToolbarDropdownMenuItem onClick={() => setShareNotebookOpen(true)}>
+                      <Share2 className="mr-2 h-4 w-4" />
+                      Share
+                    </ToolbarDropdownMenuItem>
+                  )}
+                  {canDeleteNotebook && (
+                    <ToolbarDropdownMenuItem
+                      onClick={() => setDeleteNotebookOpen(true)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </ToolbarDropdownMenuItem>
+                  )}
+                </ToolbarDropdownMenuContent>
+              </ToolbarDropdownMenu>
+            )}
           </div>
         )}
       </div>
@@ -190,35 +243,45 @@ const NotebookView = () => {
       ) : (
         effectiveViewMode === "card" ? (
           <div className="flex flex-wrap gap-4">
-            {notes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                query={searchQuery || undefined}
-                onClick={() => handleNoteClick(note)}
-                onRename={() => setRenameNote(note)}
-                onMove={() => setMoveNote(note)}
-                onTags={() => setTagsNote(note)}
-                onTagClick={handleTagClick}
-                onDelete={() => setDeleteTarget(note)}
-              />
-            ))}
+            {notes.map((note) => {
+              const owned = note.userId === myUserId;
+              const noteEditable = owned || (note as SyncNote).accessLevel === "readwrite";
+              return (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  query={searchQuery || undefined}
+                  onClick={() => handleNoteClick(note)}
+                  onRename={noteEditable ? () => setRenameNote(note) : undefined}
+                  onMove={owned ? () => setMoveNote(note) : undefined}
+                  onTags={noteEditable ? () => setTagsNote(note) : undefined}
+                  onShare={owned ? () => setShareNote(note) : undefined}
+                  onTagClick={handleTagClick}
+                  onDelete={owned ? () => setDeleteTarget(note) : undefined}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="divide-y rounded-lg border">
-            {notes.map((note) => (
-              <NoteListItem
-                key={note.id}
-                note={note}
-                query={searchQuery || undefined}
-                onClick={() => handleNoteClick(note)}
-                onRename={() => setRenameNote(note)}
-                onMove={() => setMoveNote(note)}
-                onTags={() => setTagsNote(note)}
-                onTagClick={handleTagClick}
-                onDelete={() => setDeleteTarget(note)}
-              />
-            ))}
+            {notes.map((note) => {
+              const owned = note.userId === myUserId;
+              const noteEditable = owned || (note as SyncNote).accessLevel === "readwrite";
+              return (
+                <NoteListItem
+                  key={note.id}
+                  note={note}
+                  query={searchQuery || undefined}
+                  onClick={() => handleNoteClick(note)}
+                  onRename={noteEditable ? () => setRenameNote(note) : undefined}
+                  onMove={owned ? () => setMoveNote(note) : undefined}
+                  onTags={noteEditable ? () => setTagsNote(note) : undefined}
+                  onShare={owned ? () => setShareNote(note) : undefined}
+                  onTagClick={handleTagClick}
+                  onDelete={owned ? () => setDeleteTarget(note) : undefined}
+                />
+              );
+            })}
           </div>
         )
       )}
@@ -298,6 +361,73 @@ const NotebookView = () => {
             });
         }}
         onCancel={() => setTagsNote(null)}
+      />
+
+      {renameNotebookOpen && (
+        <RenameDialog
+          open={true}
+          currentName={notebook.name}
+          label="Notebook Name"
+          onRename={(newName) => {
+            const unmask = mask("Renaming...");
+            updateNotebook(notebook.id, newName)
+              .pipe(take(1))
+              .subscribe({
+                complete: () => {
+                  unmask();
+                  setRenameNotebookOpen(false);
+                },
+                error: () => {
+                  unmask();
+                  setRenameNotebookOpen(false);
+                },
+              });
+          }}
+          onCancel={() => setRenameNotebookOpen(false)}
+        />
+      )}
+
+      {shareNotebookOpen && (
+        <ShareDialog
+          open={true}
+          resourceType="notebook"
+          resourceId={notebook.id}
+          resourceName={notebook.name}
+          onClose={() => setShareNotebookOpen(false)}
+        />
+      )}
+
+      {shareNote && (
+        <ShareDialog
+          open={true}
+          resourceType="note"
+          resourceId={shareNote.id}
+          resourceName={shareNote.title || "Untitled"}
+          onClose={() => setShareNote(null)}
+        />
+      )}
+
+      <DeleteConfirmDialog
+        open={deleteNotebookOpen}
+        title="Delete Notebook"
+        message={`Are you sure you want to delete "${notebook.name}"? All notes in this notebook will also be deleted. You can restore them from Trash.`}
+        onConfirm={() => {
+          const unmask = mask("Deleting notebook...");
+          deleteNotebook(notebook.id)
+            .pipe(take(1))
+            .subscribe({
+              complete: () => {
+                unmask();
+                setDeleteNotebookOpen(false);
+                navigate("/");
+              },
+              error: () => {
+                unmask();
+                setDeleteNotebookOpen(false);
+              },
+            });
+        }}
+        onCancel={() => setDeleteNotebookOpen(false)}
       />
     </div>
   );

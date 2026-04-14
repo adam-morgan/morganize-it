@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Pencil, FolderInput, Tag, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, FolderInput, Tag, Share2, Trash2 } from "lucide-react";
 import { formatRelativeTime } from "./NoteCard";
 import { HighlightedText, getSnippet, SnippetText } from "../search/search-utils";
 import TagBadge from "../components/TagBadge";
@@ -14,14 +14,15 @@ type NoteListItemProps = {
   note: Note;
   query?: string;
   onClick: () => void;
-  onRename: () => void;
-  onMove: () => void;
-  onTags: () => void;
+  onRename?: () => void;
+  onMove?: () => void;
+  onTags?: () => void;
+  onShare?: () => void;
   onTagClick: (tag: string) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 };
 
-const NoteListItem = ({ note, query, onClick, onRename, onMove, onTags, onTagClick, onDelete }: NoteListItemProps) => {
+const NoteListItem = ({ note, query, onClick, onRename, onMove, onTags, onShare, onTagClick, onDelete }: NoteListItemProps) => {
   const snippet = query ? getSnippet(note.textContent, query) : null;
 
   return (
@@ -52,31 +53,47 @@ const NoteListItem = ({ note, query, onClick, onRename, onMove, onTags, onTagCli
           {formatRelativeTime(note.updatedAt)}
         </span>
       </div>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenuItem onClick={onRename}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onMove}>
-            <FolderInput className="mr-2 h-4 w-4" />
-            Move to...
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onTags}>
-            <Tag className="mr-2 h-4 w-4" />
-            Tags...
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={onDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {(onRename || onMove || onTags || onShare || onDelete) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            {onRename && (
+              <DropdownMenuItem onClick={onRename}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Rename
+              </DropdownMenuItem>
+            )}
+            {onMove && (
+              <DropdownMenuItem onClick={onMove}>
+                <FolderInput className="mr-2 h-4 w-4" />
+                Move to...
+              </DropdownMenuItem>
+            )}
+            {onTags && (
+              <DropdownMenuItem onClick={onTags}>
+                <Tag className="mr-2 h-4 w-4" />
+                Tags...
+              </DropdownMenuItem>
+            )}
+            {onShare && (
+              <DropdownMenuItem onClick={onShare}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Share...
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 };
