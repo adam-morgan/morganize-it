@@ -1,15 +1,22 @@
 import { useEffect, useRef, useCallback } from "react";
-import { take } from "rxjs";
+import { forkJoin, take } from "rxjs";
 import { useNotebooksSlice } from "@/features/notes";
 import { useAuthSlice } from "@/features/auth";
+import { useFriendsSlice } from "@/features/friends/friendsSlice";
+import { useRealtimeSync } from "@/features/realtime";
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const MIN_SYNC_INTERVAL_MS = 10_000; // 10 seconds
 
 export const useAppSync = () => {
-  const resync = useNotebooksSlice((s) => s.resync);
+  const resyncNotebooks = useNotebooksSlice((s) => s.resync);
+  const refreshFriends = useFriendsSlice((s) => s.refresh);
   const initialized = useNotebooksSlice((s) => s.initialized);
   const user = useAuthSlice((s) => s.user);
+
+  // Push channel: subscribe to server-sent change events and trigger the same
+  // resync entrypoints used by the visibility/poll triggers below.
+  useRealtimeSync();
 
   const lastSyncRef = useRef(0);
   const syncInProgressRef = useRef(false);
@@ -25,7 +32,10 @@ export const useAppSync = () => {
     syncInProgressRef.current = true;
     lastSyncRef.current = now;
 
-    resync()
+    forkJoin({
+      notebooks: resyncNotebooks(),
+      friends: refreshFriends(),
+    })
       .pipe(take(1))
       .subscribe({
         next: () => {
@@ -36,7 +46,7 @@ export const useAppSync = () => {
           syncInProgressRef.current = false;
         },
       });
-  }, [initialized, user, resync]);
+  }, [initialized, user, resyncNotebooks, refreshFriends]);
 
   // Sync when app becomes visible (primary mechanism)
   useEffect(() => {

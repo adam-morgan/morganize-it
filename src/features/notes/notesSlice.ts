@@ -51,17 +51,17 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
   sortBy: getStoredSortBy(),
   loadNotes: (notebookId) => {
     const user = useAuthSlice.getState().user;
-    const notesSvc = getNotesService(user as User);
-
-    return notesSvc.getNotes(notebookId).pipe(
-      take(1),
-      tap((notes) =>
-        set((state) => ({
-          ...state,
-          notes: { ...state.notes, [notebookId]: notes },
-        }))
-      )
-    );
+    return getNotesService(user as User)
+      .getNotes(notebookId)
+      .pipe(
+        take(1),
+        tap((notes) =>
+          set((state) => ({
+            ...state,
+            notes: { ...state.notes, [notebookId]: notes },
+          }))
+        )
+      );
   },
   expandNotebook: (id) => set({ expandedNotebookId: id }),
   createNote: (notebookId, title) => {
@@ -102,13 +102,21 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
         set((state) => {
           const newNotes = { ...state.notes };
 
+          // Merge API response onto existing note to preserve sync metadata
+          // (accessLevel, ownerName, etc.) that the plain Note API doesn't return.
+          const merge = (existing: Note) => ({ ...existing, ...updated });
+
           // If notebookId changed, move between lists
           if (data.notebookId && data.notebookId !== notebookId) {
+            const existing = (newNotes[notebookId] ?? []).find((n) => n.id === id);
             newNotes[notebookId] = (newNotes[notebookId] ?? []).filter((n) => n.id !== id);
-            newNotes[data.notebookId] = [...(newNotes[data.notebookId] ?? []), updated];
+            newNotes[data.notebookId] = [
+              ...(newNotes[data.notebookId] ?? []),
+              existing ? merge(existing) : updated,
+            ];
           } else {
             newNotes[notebookId] = (newNotes[notebookId] ?? []).map((n) =>
-              n.id === id ? updated : n
+              n.id === id ? merge(n) : n
             );
           }
 
@@ -129,7 +137,7 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
           notes: {
             ...state.notes,
             [notebookId]: (state.notes[notebookId] ?? []).map((n) =>
-              n.id === id ? updated : n
+              n.id === id ? { ...n, ...updated } : n
             ),
           },
         }))

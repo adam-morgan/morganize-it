@@ -6,6 +6,8 @@ import { useRecentNotesSlice } from "../notes/recentNotesSlice";
 import { useTrashSlice } from "../notes/trashSlice";
 import { clearCache } from "../notes/services/cache-db";
 import { migrateLocalDataToServer } from "../notes/services/migration";
+import { useFriendsSlice } from "../friends/friendsSlice";
+import { useSharesSlice } from "../shares/sharesSlice";
 import { map, Observable, of, switchMap, take, tap } from "rxjs";
 
 type AuthSlice = {
@@ -76,6 +78,8 @@ export const useAuthSlice = create<AuthSlice>((set, get) => ({
           useNotesSlice.getState().reset();
           useRecentNotesSlice.getState().reset();
           useTrashSlice.getState().reset();
+          useFriendsSlice.getState().reset();
+          useSharesSlice.getState().reset();
           if (userId) {
             clearCache(userId).catch(() => {});
           }

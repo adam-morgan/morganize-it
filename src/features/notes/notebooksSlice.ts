@@ -8,7 +8,7 @@ import { SyncResult } from "./services/sync-manager";
 
 type NotebooksSlice = {
   initialized: boolean;
-  notebooks: Notebook[];
+  notebooks: SyncNotebook[];
   initialize: () => Observable<void>;
   resync: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
@@ -20,22 +20,17 @@ type NotebooksSlice = {
 const applySyncResult = (result: SyncResult) => {
   useNotebooksSlice.setState({ notebooks: result.notebooks });
 
-  // Update notes slice for any notebookIds currently loaded in state
-  const notesState = useNotesSlice.getState();
-  const notesByNotebook: Record<string, Note[]> = {};
+  // Group notes by notebookId
+  const notesByNotebook: Record<string, SyncNote[]> = {};
   for (const note of result.notes) {
-    if (!notesByNotebook[note.notebookId]) {
-      notesByNotebook[note.notebookId] = [];
-    }
-    notesByNotebook[note.notebookId].push(note);
+    (notesByNotebook[note.notebookId] ??= []).push(note);
   }
 
-  // Update loaded notebook note lists; also update notebooks that are now empty
-  const updatedNotes = { ...notesState.notes };
-  for (const notebookId of Object.keys(updatedNotes)) {
-    if (notesByNotebook[notebookId] != null) {
-      updatedNotes[notebookId] = notesByNotebook[notebookId];
-    }
+  // Merge into notesSlice: update loaded notebooks, preserve unloaded ones
+  const prev = useNotesSlice.getState().notes;
+  const updatedNotes = { ...prev };
+  for (const [notebookId, nts] of Object.entries(notesByNotebook)) {
+    updatedNotes[notebookId] = nts;
   }
   useNotesSlice.setState({ notes: updatedNotes });
   useRecentNotesSlice.getState().reset();
@@ -75,7 +70,12 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
       // Guest mode — just load from local IDB
       return notesSvc.getNotebooks().pipe(
         take(1),
-        tap((notebooks) => set({ notebooks, initialized: true })),
+        tap((notebooks) =>
+          set({
+            notebooks: notebooks.map((nb) => ({ ...nb, accessLevel: "owner" as ShareAccessLevel })),
+            initialized: true,
+          })
+        ),
         map(() => undefined)
       );
     }
@@ -88,7 +88,12 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
           // Load from IDB immediately, then sync in background
           return notesSvc.getNotebooks().pipe(
             take(1),
-            tap((notebooks) => set({ notebooks, initialized: true })),
+            tap((notebooks) =>
+              set({
+                notebooks: notebooks as SyncNotebook[],
+                initialized: true,
+              })
+            ),
             tap(() => {
               // Background sync — fire and forget
               syncManager
@@ -122,7 +127,12 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
     return notesSvc
       .createNotebook(name)
       .pipe(
-        tap((notebook) => set((state) => ({ ...state, notebooks: [...state.notebooks, notebook] })))
+        tap((notebook) =>
+          set((state) => ({
+            ...state,
+            notebooks: [...state.notebooks, { ...notebook, accessLevel: "owner" as ShareAccessLevel }],
+          }))
+        )
       );
   },
   updateNotebook: (id, name) => {
@@ -133,7 +143,9 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
       tap((updated) =>
         set((state) => ({
           ...state,
-          notebooks: state.notebooks.map((nb) => (nb.id === id ? updated : nb)),
+          notebooks: state.notebooks.map((nb) =>
+            nb.id === id ? { ...nb, ...updated } : nb
+          ),
         }))
       )
     );

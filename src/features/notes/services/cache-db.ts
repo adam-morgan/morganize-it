@@ -1,6 +1,6 @@
 import { IDBPDatabase, openDB } from "idb";
 
-const DB_VERSION = 1;
+const DB_VERSION = 4;
 
 const getDbName = (userId: string) => `morganizeit-cache-${userId}`;
 
@@ -11,7 +11,7 @@ export const getCacheDb = (userId: string): Promise<IDBPDatabase> => {
 
   if (!dbPromises[name]) {
     dbPromises[name] = openDB(name, DB_VERSION, {
-      upgrade(db) {
+      upgrade(db, oldVersion, _newVersion, tx) {
         if (!db.objectStoreNames.contains("notebooks")) {
           const notebooks = db.createObjectStore("notebooks", { keyPath: "id" });
           notebooks.createIndex("updatedAt", "updatedAt");
@@ -25,6 +25,20 @@ export const getCacheDb = (userId: string): Promise<IDBPDatabase> => {
 
         if (!db.objectStoreNames.contains("meta")) {
           db.createObjectStore("meta", { keyPath: "key" });
+        }
+
+        // v4: unified stores — drop separate shared stores from v2/v3 and
+        // clear owned stores so the first sync pulls everything fresh (old
+        // entries lack the accessLevel field added in v4).
+        for (const name of ["shared-notebooks", "shared-notes", "shared-notebook-notes"]) {
+          if (db.objectStoreNames.contains(name)) {
+            db.deleteObjectStore(name);
+          }
+        }
+        if (oldVersion < 4) {
+          tx.objectStore("notebooks").clear();
+          tx.objectStore("notes").clear();
+          tx.objectStore("meta").clear();
         }
       },
     });
