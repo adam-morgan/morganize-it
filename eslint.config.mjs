@@ -6,7 +6,13 @@ import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
-    ignores: ["**/public/**/*", ".local/**/*", "node_modules/**/*", "src/coverage/**/*"],
+    ignores: [
+      "**/public/**/*",
+      ".local/**/*",
+      "node_modules/**/*",
+      "src/coverage/**/*",
+      ".sst/**/*",
+    ],
   },
   {
     plugins: {

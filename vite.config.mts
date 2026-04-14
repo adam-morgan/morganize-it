@@ -24,6 +24,11 @@ export default defineConfig({
         target: "http://localhost:9001/",
         changeOrigin: true,
       },
+      "/ws": {
+        target: "ws://localhost:9001/",
+        ws: true,
+        changeOrigin: true,
+      },
     },
     port: 5173,
   },
