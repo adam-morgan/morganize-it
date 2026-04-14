@@ -22,6 +22,13 @@ export class NotebookKnexService extends UserEntityReactiveKnexService<Notebook>
   permanentDelete(id: string): Observable<void> {
     return from(
       getKnex().transaction(async (trx) => {
+        await trx("shares")
+          .where(function () {
+            this.where({ resourceType: "notebook", resourceId: id }).orWhere({
+              notebookId: id,
+            });
+          })
+          .delete();
         await trx("notes").where({ notebookId: id }).delete();
         const count = await trx("notebooks").where({ id }).delete();
         if (count === 0) {

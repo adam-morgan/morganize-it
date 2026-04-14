@@ -5,6 +5,7 @@ import { TableID } from "@/server/db/reactive-service";
 import { concat, from, Observable, of, switchMap, toArray } from "rxjs";
 import { ReactiveDynamoService } from "@/server/db/dynamo/reactive-dynamo-service";
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { getShareService } from "@/server/features/shares";
 
 export class NotebookDynamoService extends UserEntityReactiveDynamoService<Notebook> {
   constructor() {
@@ -59,7 +60,9 @@ export class NotebookDynamoService extends UserEntityReactiveDynamoService<Noteb
               TableName: this.tableName,
               Key: { userId: notebook.userId, id: notebook.id },
             })).then(() => undefined))
-          )
+          ),
+          // Clean up all shares for this notebook (notebook-level + any note-level shares).
+          switchMap(() => getShareService().deleteAllForNotebook(id))
         );
       })
     );

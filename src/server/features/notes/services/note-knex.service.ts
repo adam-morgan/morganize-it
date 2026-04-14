@@ -6,24 +6,35 @@ import { NotFoundError } from "@/server/errors";
 
 export class NoteKnexService extends UserEntityReactiveKnexService<Note> {
   constructor() {
-    super("notes", ["id", "title", "content", "textContent", "tags", "notebookId", "userId", "createdAt", "updatedAt", "lastOpenedAt", "deletedAt"], "id");
+    super("notes", ["id", "title", "content", "textContent", "tags", "attachments", "notebookId", "userId", "createdAt", "updatedAt", "lastOpenedAt", "deletedAt"], "id");
   }
 
   override find(options?: FindOptions, userId?: string): Observable<PageResult<Note>> {
     return super.find(options, userId).pipe(
       map((result) => ({
         ...result,
-        items: result.items.map((item) => this.parseTags(item)),
+        items: result.items.map((item) => this.parseJsonFields(item)),
       }))
     );
   }
 
   override create(data: Note): Observable<Note> {
-    return super.create(this.serializeTags(data)).pipe(map((item) => this.parseTags(item)));
+    return super.create(this.serializeJsonFields(data)).pipe(map((item) => this.parseJsonFields(item)));
   }
 
   override update(id: TableID, data: Note): Observable<Note> {
-    return super.update(id, this.serializeTags(data)).pipe(map((item) => this.parseTags(item)));
+    return super.update(id, this.serializeJsonFields(data)).pipe(
+      map((item) => this.parseJsonFields(item)),
+      switchMap((item) =>
+        // Keep note-level share rows' denormalized notebookId in sync if the note was moved.
+        from(
+          getKnex()
+            .update({ notebookId: item.notebookId })
+            .from("shares")
+            .where({ resourceType: "note", resourceId: id })
+        ).pipe(switchMap(() => of(item)))
+      )
+    );
   }
 
   override delete(id: TableID): Observable<void> {
@@ -43,7 +54,13 @@ export class NoteKnexService extends UserEntityReactiveKnexService<Note> {
 
   permanentDelete(id: string): Observable<void> {
     return from(
-      getKnex().delete().from("notes").where({ id })
+      getKnex().transaction<number>(async (trx) => {
+        await trx("shares")
+          .where({ resourceType: "note", resourceId: id })
+          .delete();
+        const count: number = await trx("notes").where({ id }).delete();
+        return count;
+      })
     ).pipe(
       switchMap((count) =>
         count === 0 ? throwError(() => new NotFoundError("Record not found")) : of(undefined)
@@ -51,11 +68,19 @@ export class NoteKnexService extends UserEntityReactiveKnexService<Note> {
     );
   }
 
-  private parseTags(item: Note): Note {
-    return { ...item, tags: typeof item.tags === "string" ? JSON.parse(item.tags as string) : (item.tags ?? []) };
+  private parseJsonFields(item: Note): Note {
+    return {
+      ...item,
+      tags: typeof item.tags === "string" ? JSON.parse(item.tags as string) : (item.tags ?? []),
+      attachments: typeof item.attachments === "string" ? JSON.parse(item.attachments as string) : (item.attachments ?? []),
+    };
   }
 
-  private serializeTags(data: Note): Note {
-    return { ...data, tags: JSON.stringify(data.tags ?? []) as unknown as string[] };
+  private serializeJsonFields(data: Note): Note {
+    return {
+      ...data,
+      tags: JSON.stringify(data.tags ?? []) as unknown as string[],
+      attachments: JSON.stringify(data.attachments ?? []) as unknown as Attachment[],
+    };
   }
 }

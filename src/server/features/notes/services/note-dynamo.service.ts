@@ -2,8 +2,9 @@ import { UserEntityReactiveDynamoService } from "@/server/db/dynamo/user-entity-
 import { getDocClient, getTableName } from "@/server/db/dynamo/client";
 import { notesTableSchema } from "@/server/db/dynamo/tables";
 import { TableID } from "@/server/db/reactive-service";
-import { from, Observable, of, switchMap } from "rxjs";
+import { forkJoin, from, Observable, of, switchMap } from "rxjs";
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { getShareService } from "@/server/features/shares";
 
 export class NoteDynamoService extends UserEntityReactiveDynamoService<Note> {
   constructor() {
@@ -12,6 +13,27 @@ export class NoteDynamoService extends UserEntityReactiveDynamoService<Note> {
 
   protected override buildKey(id: TableID): Record<string, unknown> {
     return { id };
+  }
+
+  override update(id: TableID, data: Note): Observable<Note> {
+    return super.update(id, data).pipe(
+      switchMap((updated) =>
+        // Keep note-level share rows' denormalized notebookId in sync if the note was moved.
+        getShareService()
+          .findForResource("note", id)
+          .pipe(
+            switchMap((shares) => {
+              const stale = shares.filter((s) => s.notebookId !== updated.notebookId);
+              if (stale.length === 0) return of(updated);
+              return forkJoin(
+                stale.map((s) =>
+                  getShareService().update(s.id, { ...s, notebookId: updated.notebookId })
+                )
+              ).pipe(switchMap(() => of(updated)));
+            })
+          )
+      )
+    );
   }
 
   override delete(id: TableID): Observable<void> {
@@ -31,7 +53,9 @@ export class NoteDynamoService extends UserEntityReactiveDynamoService<Note> {
           TableName: this.tableName,
           Key: { userId: note.userId, id: note.id },
         });
-        return from(getDocClient().send(command).then(() => undefined));
+        return from(getDocClient().send(command).then(() => undefined)).pipe(
+          switchMap(() => getShareService().deleteAllForResource("note", id))
+        );
       })
     );
   }
