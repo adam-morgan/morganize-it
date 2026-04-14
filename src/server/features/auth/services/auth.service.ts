@@ -36,7 +36,7 @@ export abstract class AbstractAuthService implements AuthService {
   }
 
   async getUserByEmail(email: string, withPassword: boolean): Promise<User | undefined> {
-    const user = await this._getUserByEmail(email);
+    const user = await this._getUserByEmail(email.toLowerCase());
     if (!user) {
       return undefined;
     }
@@ -52,6 +52,7 @@ export abstract class AbstractAuthService implements AuthService {
     const userToCreate = {
       ...user,
       id: uuid(),
+      email: user.email.toLowerCase(),
       password: user.password ? await hashPassword(user.password) : undefined,
     };
 
