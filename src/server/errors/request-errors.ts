@@ -33,3 +33,12 @@ export class NotFoundError extends Error {
     this.code = 404;
   }
 }
+
+export class ConflictError extends Error {
+  public code: number;
+
+  constructor(message: string) {
+    super(message);
+    this.code = 409;
+  }
+}

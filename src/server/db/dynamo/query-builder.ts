@@ -214,13 +214,54 @@ export const buildDynamoQuery = (
     const partitionRef = nameRef(ctx, indexMatch.partitionKey);
     const partitionPlaceholder = nextPlaceholder(ctx);
     ctx.values[partitionPlaceholder] = indexMatch.partitionValue;
-    const keyCondition = `${partitionRef} = ${partitionPlaceholder}`;
+    let keyCondition = `${partitionRef} = ${partitionPlaceholder}`;
 
-    // Build filter for remaining criteria (excluding partition key)
+    // If the criteria includes the sort key with an equality / range operator,
+    // it MUST go in the KeyConditionExpression — DynamoDB rejects key
+    // attributes appearing in a FilterExpression. Pull it out before building
+    // the filter expression for non-key attributes.
     let filterExpression: string | undefined;
     if (findOptions?.criteria) {
       const remainingCriteria = { ...findOptions.criteria } as FilterCriteria;
       delete remainingCriteria[indexMatch.partitionKey];
+
+      if (indexMatch.sortKey && remainingCriteria[indexMatch.sortKey] !== undefined) {
+        const sortValue = remainingCriteria[indexMatch.sortKey];
+        const sortRef = nameRef(ctx, indexMatch.sortKey);
+        const sortPlaceholder = nextPlaceholder(ctx);
+
+        if (sortValue === null || typeof sortValue !== "object") {
+          ctx.values[sortPlaceholder] = sortValue;
+          keyCondition += ` AND ${sortRef} = ${sortPlaceholder}`;
+        } else {
+          const ops = sortValue as FilterOperator;
+          const operatorEntries = Object.entries(ops);
+          // Sort-key conditions can be: =, <, <=, >, >=, BETWEEN, begins_with.
+          // For supported single-operator forms, put it in the KeyConditionExpression.
+          if (operatorEntries.length === 1) {
+            const [op, val] = operatorEntries[0];
+            const sortOpMap: Record<string, string> = {
+              $eq: "=",
+              $lt: "<",
+              $lte: "<=",
+              $gt: ">",
+              $gte: ">=",
+            };
+            if (op in sortOpMap) {
+              ctx.values[sortPlaceholder] = val;
+              keyCondition += ` AND ${sortRef} ${sortOpMap[op]} ${sortPlaceholder}`;
+            } else {
+              // Unsupported in KeyCondition — fall back to leaving in filter
+              // (will likely fail at the DynamoDB level for $in/$nin/$ne).
+              throw new Error(
+                `Operator ${op} cannot be applied to sort key ${indexMatch.sortKey}`
+              );
+            }
+          }
+        }
+        delete remainingCriteria[indexMatch.sortKey];
+      }
+
       if (Object.keys(remainingCriteria).length > 0) {
         filterExpression = buildFilterExpression(ctx, remainingCriteria);
       }
