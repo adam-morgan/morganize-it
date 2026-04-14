@@ -3,6 +3,12 @@ import express, { Application, Request, Response } from "express";
 import { authRoutes } from "./routes/auth";
 import { notebookRoutes } from "./routes/notebook";
 import { noteRoutes } from "./routes/note";
+import { friendsRoutes } from "./routes/friends";
+import { usersRoutes } from "./routes/users";
+import { sharesRoutes } from "./routes/shares";
+import { sharedResourceRoutes } from "./routes/shared-resources";
+import { syncRoutes } from "./routes/sync";
+import { attachmentRoutes } from "./routes/attachment";
 import packageJSON from "../../../package.json";
 import { jwtMiddleware } from "./middleware/jwt";
 import { handleErrors } from "./errorHandling";
@@ -10,7 +16,14 @@ import { handleErrors } from "./errorHandling";
 const app: Application = express();
 const apiRouter = express.Router();
 
-app.use(express.json({ limit: "20mb" }));
+app.use((req, res, next) => {
+  // Skip JSON parsing for direct attachment upload endpoint — raw binary body
+  if (req.method === "PUT" && req.url.startsWith("/api/attachments/upload/")) {
+    next();
+    return;
+  }
+  express.json({ limit: "20mb" })(req, res, next);
+});
 app.use(cors({ origin: ["http://localhost:5173"] }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -27,8 +40,14 @@ app.use(jwtMiddleware);
 app.use("/api", apiRouter);
 
 authRoutes(apiRouter);
+usersRoutes(apiRouter);
+sharesRoutes(apiRouter);
+sharedResourceRoutes(apiRouter);
+friendsRoutes(apiRouter);
 notebookRoutes(apiRouter);
 noteRoutes(apiRouter);
+attachmentRoutes(apiRouter);
+syncRoutes(apiRouter);
 
 // Serve a successful response. For use with wait-on
 apiRouter.get("/health", (req, res) => {
