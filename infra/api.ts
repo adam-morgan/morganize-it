@@ -34,16 +34,9 @@ const nodejs = {
   },
 };
 
-export const wsApi = new sst.aws.ApiGatewayWebSocket("WsApi", {
-  domain:
-    $app.stage === "prod"
-      ? {
-          dns: false,
-          name: "ws.notes.adammorgan.ca",
-          cert: "arn:aws:acm:ca-central-1:499854674714:certificate/7c21edc8-636c-455c-aa9c-28506ae2c45e",
-        }
-      : undefined,
-});
+// WebSocket API uses the default execute-api domain (wss://<id>.execute-api.<region>.amazonaws.com/$default).
+// `wsApi.url` is plumbed through to the frontend as VITE_WS_URL by infra/web.ts.
+export const wsApi = new sst.aws.ApiGatewayWebSocket("WsApi");
 
 wsApi.route("$connect", {
   handler: "src/server/lambda/handlers/ws/connect.handler",
