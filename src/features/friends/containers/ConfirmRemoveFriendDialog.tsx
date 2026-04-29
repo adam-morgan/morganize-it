@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { KeyboardEvent } from "react";
 
 type Props = {
   friend: Friend | null;
@@ -16,9 +17,17 @@ type Props = {
 };
 
 const ConfirmRemoveFriendDialog = ({ friend, onConfirm, onCancel }: Props) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === "BUTTON") return;
+    e.preventDefault();
+    onConfirm();
+  };
+
   return (
     <AlertDialog open={friend != null}>
-      <AlertDialogContent>
+      <AlertDialogContent onKeyDown={handleKeyDown}>
         <AlertDialogHeader>
           <AlertDialogTitle>Remove Friend</AlertDialogTitle>
           <AlertDialogDescription>

@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ReactNode } from "react";
+import { KeyboardEvent, ReactNode } from "react";
 
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl";
 
@@ -33,20 +33,41 @@ const sizeClasses: Record<DialogSize, string> = {
 };
 
 const Dialog = (props: DialogProps) => {
+  const actions = props.actions;
+  const primaryAction = actions?.[actions.length - 1];
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === "BUTTON" ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable
+    ) {
+      return;
+    }
+    if (!primaryAction || primaryAction.disabled) return;
+    e.preventDefault();
+    primaryAction.onClick();
+  };
+
   return (
     <ShadDialog open={props.open}>
-      <DialogContent className={sizeClasses[props.size ?? "sm"]}>
+      <DialogContent
+        className={sizeClasses[props.size ?? "sm"]}
+        onKeyDown={handleKeyDown}
+      >
         <DialogHeader>
           <DialogTitle>{props.title}</DialogTitle>
           {props.description && <DialogDescription>{props.description}</DialogDescription>}
         </DialogHeader>
         {props.content}
-        {props.actions?.length && (
+        {actions?.length && (
           <DialogFooter>
-            {props.actions.map((action, index) => (
+            {actions.map((action, index) => (
               <Button
                 key={index}
-                variant={index === 0 ? "default" : "outline"}
+                variant={index === actions.length - 1 ? "default" : "outline"}
                 disabled={action.disabled === true}
                 onClick={action.onClick}
               >

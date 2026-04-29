@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, KeyboardEvent } from "react";
 import { useNotebooksSlice } from "../notebooksSlice";
 
 type MoveNoteDialogProps = {
@@ -36,9 +36,18 @@ const MoveNoteDialog = ({ open, note, onMove, onCancel }: MoveNoteDialogProps) =
     if (open) setTargetNotebookId("");
   }, [open]);
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === "BUTTON") return;
+    if (!targetNotebookId) return;
+    e.preventDefault();
+    onMove(targetNotebookId);
+  };
+
   return (
     <AlertDialog open={open}>
-      <AlertDialogContent>
+      <AlertDialogContent onKeyDown={handleKeyDown}>
         <AlertDialogHeader>
           <AlertDialogTitle>Move Note</AlertDialogTitle>
           <AlertDialogDescription>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { take } from "rxjs";
 import {
   File,
@@ -12,8 +12,11 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getAttachmentDownloadUrl, deleteNoteAttachment } from "../services/attachment-service";
 import DeleteConfirmDialog from "../containers/DeleteConfirmDialog";
+
+const LONG_PRESS_MS = 500;
 
 type Props = {
   noteId: string;
@@ -38,6 +41,29 @@ const getFileIcon = (mimeType: string) => {
 const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: Props) => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
+  const [pressedId, setPressedId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchStart = (attachmentId: string) => {
+    longPressFiredRef.current = false;
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setPressedId(attachmentId);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleTouchEndOrCancel = () => {
+    clearLongPressTimer();
+  };
 
   const handleOpen = (attachment: Attachment) => {
     setLoadingId(attachment.id);
@@ -70,38 +96,74 @@ const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: P
     <>
       <div className="flex flex-wrap gap-2 border-b px-4 py-2">
         {attachments.map((a) => (
-          <div
+          <Popover
             key={a.id}
-            className="flex items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
+            open={pressedId === a.id}
+            onOpenChange={(open) => {
+              if (!open) setPressedId(null);
+            }}
           >
-            <button
-              type="button"
-              className="flex cursor-pointer items-center gap-1.5"
-              onClick={() => handleOpen(a)}
-              disabled={loadingId === a.id}
-            >
-              {loadingId === a.id ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-              ) : (
-                getFileIcon(a.mimeType)
-              )}
-              <span className="max-w-[120px] truncate sm:max-w-[200px]">{a.filename}</span>
-            </button>
-            {canEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 cursor-pointer p-0 hover:bg-transparent"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteTarget(a);
+            <PopoverTrigger asChild>
+              <div
+                className="flex items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-xs transition-colors hover:bg-muted"
+                onTouchStart={() => handleTouchStart(a.id)}
+                onTouchEnd={handleTouchEndOrCancel}
+                onTouchMove={handleTouchEndOrCancel}
+                onTouchCancel={handleTouchEndOrCancel}
+                onContextMenu={(e) => {
+                  if (longPressFiredRef.current) e.preventDefault();
                 }}
-                disabled={loadingId === a.id}
               >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
-          </div>
+                <button
+                  type="button"
+                  className="flex cursor-pointer items-center gap-1.5"
+                  onClick={(e) => {
+                    if (longPressFiredRef.current) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      longPressFiredRef.current = false;
+                      return;
+                    }
+                    handleOpen(a);
+                  }}
+                  disabled={loadingId === a.id}
+                >
+                  {loadingId === a.id ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    getFileIcon(a.mimeType)
+                  )}
+                  <span
+                    className="max-w-[120px] truncate sm:max-w-[200px]"
+                    title={a.filename}
+                  >
+                    {a.filename}
+                  </span>
+                </button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 cursor-pointer p-0 hover:bg-transparent"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(a);
+                    }}
+                    disabled={loadingId === a.id}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="start"
+              className="w-auto max-w-[80vw] px-3 py-2 text-xs break-all"
+            >
+              {a.filename}
+            </PopoverContent>
+          </Popover>
         ))}
       </div>
 

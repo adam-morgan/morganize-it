@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { KeyboardEvent } from "react";
 
 type PromptProps = {
   open: boolean;
@@ -18,9 +19,17 @@ type PromptProps = {
 };
 
 const Prompt = (props: PromptProps) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === "BUTTON") return;
+    e.preventDefault();
+    props.onConfirm();
+  };
+
   return (
     <AlertDialog open={props.open}>
-      <AlertDialogContent>
+      <AlertDialogContent onKeyDown={handleKeyDown}>
         <AlertDialogHeader>
           <AlertDialogTitle>{props.title}</AlertDialogTitle>
           <AlertDialogDescription>{props.promptText}</AlertDialogDescription>

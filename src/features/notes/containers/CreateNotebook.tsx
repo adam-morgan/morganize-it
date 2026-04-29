@@ -34,6 +34,7 @@ const CreateNotebook = ({ trigger }: CreateNotebookButtonProps) => {
       }
       size="xs"
       actions={[
+        { label: "Cancel" },
         {
           label: "Create",
           disabled: !Boolean(name?.trim()),
@@ -45,7 +46,6 @@ const CreateNotebook = ({ trigger }: CreateNotebookButtonProps) => {
             });
           },
         },
-        { label: "Cancel" },
       ]}
       trigger={trigger}
       onOpen={() => setName("")}

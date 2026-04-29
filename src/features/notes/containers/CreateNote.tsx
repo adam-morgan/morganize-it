@@ -37,6 +37,7 @@ const CreateNote = ({ notebookId, trigger }: CreateNoteProps) => {
       }
       size="xs"
       actions={[
+        { label: "Cancel" },
         {
           label: "Create",
           disabled: !Boolean(title?.trim()),
@@ -51,7 +52,6 @@ const CreateNote = ({ notebookId, trigger }: CreateNoteProps) => {
             });
           },
         },
-        { label: "Cancel" },
       ]}
       trigger={trigger}
       onOpen={() => setTitle("")}
