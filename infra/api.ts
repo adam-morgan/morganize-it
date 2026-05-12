@@ -287,13 +287,7 @@ api.route("GET /users/find", {
 
 // Friends
 const friendsLinks = [friendshipsTable, usersTable, jwtSecret, ...realtimeLinks];
-const friendsRemoveLinks = [
-  friendshipsTable,
-  sharesTable,
-  usersTable,
-  jwtSecret,
-  ...realtimeLinks,
-];
+const friendsRemoveLinks = [friendshipsTable, sharesTable, usersTable, jwtSecret, ...realtimeLinks];
 
 api.route("GET /friends", {
   handler: `${handlerBase}/friends/list.handler`,

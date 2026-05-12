@@ -32,6 +32,8 @@ import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import { Markdown } from "tiptap-markdown";
+import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
 import {
   ArrowLeft,
   MoreVertical,
@@ -225,6 +227,15 @@ const extensions = [
   TableRow,
   TableCell,
   TableHeader,
+  Markdown.configure({
+    html: false,
+    tightLists: true,
+    bulletListMarker: "-",
+    linkify: true,
+    breaks: false,
+    transformPastedText: true,
+    transformCopiedText: false,
+  }),
 ];
 
 // --- Link popover button (shared by toolbar + bubble menu) ---
@@ -790,6 +801,48 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
           editorProps={{
             handleDOMEvents: {
               keydown: (_view, event) => handleCommandNavigation(event),
+            },
+            handlePaste: (view, event) => {
+              const editor = editorRef.current;
+              const parser = editor?.storage?.markdown?.parser;
+              if (!editor || !parser) return false;
+
+              const clipboard = (event as ClipboardEvent).clipboardData;
+              if (!clipboard) return false;
+
+              const shiftHeld = (view as unknown as { input?: { shiftKey?: boolean } })
+                .input?.shiftKey;
+              if (shiftHeld) return false;
+
+              const text = clipboard.getData("text/plain");
+              if (!text) return false;
+
+              const looksLikeMarkdown =
+                /^#{1,6} \S/m.test(text) ||
+                /^\s*[-*+] \S/m.test(text) ||
+                /^\s*\d+\.\s+\S/m.test(text) ||
+                /^\s*[-*+] \[[ xX]\]\s/m.test(text) ||
+                /^>\s+\S/m.test(text) ||
+                /^```/m.test(text) ||
+                /\*\*[^*\n]+\*\*/.test(text) ||
+                /__[^_\n]+__/.test(text) ||
+                /~~[^~\n]+~~/.test(text) ||
+                /`[^`\n]+`/.test(text) ||
+                /\[[^\]\n]+\]\([^)\n]+\)/.test(text);
+
+              if (!looksLikeMarkdown) return false;
+
+              const parsedHtml = parser.parse(text);
+              if (typeof parsedHtml !== "string" || !parsedHtml) return false;
+
+              const wrapper = document.createElement("div");
+              wrapper.innerHTML = parsedHtml;
+              const slice = PMDOMParser.fromSchema(view.state.schema).parseSlice(
+                wrapper,
+                { preserveWhitespace: true },
+              );
+              view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
+              return true;
             },
             transformPastedHTML(html) {
               return html.replace(/<a\b[^>]*>(.*?)<\/a>/gi, "$1");
