@@ -22,6 +22,8 @@ import {
   Placeholder,
   HorizontalRule,
   HighlightExtension,
+  TextStyle,
+  Color,
   CustomKeymap,
   Command,
   createSuggestionItems,
@@ -33,7 +35,8 @@ import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import { Markdown } from "tiptap-markdown";
-import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
+import { Extension } from "@tiptap/core";
+import { DOMParser as PMDOMParser, DOMSerializer as PMDOMSerializer } from "@tiptap/pm/model";
 import {
   ArrowLeft,
   MoreVertical,
@@ -61,6 +64,8 @@ import {
   Link2,
   Check,
   X,
+  Palette,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -204,6 +209,49 @@ const starterKit = StarterKit.configure({
   dropcursor: { color: "#DBEAFE", width: 4 },
 });
 
+const CopyAsMarkdown = Extension.create({
+  name: "copyAsMarkdown",
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Alt-c": () => {
+        const { editor } = this;
+        const serializer = editor.storage?.markdown?.serializer;
+        if (!serializer) return false;
+
+        const { view } = editor;
+        const { from, to, empty } = view.state.selection;
+        if (empty) return false;
+
+        const slice = view.state.doc.slice(from, to);
+        const docNode = view.state.schema.topNodeType.create(null, slice.content);
+        const markdown = serializer.serialize(docNode);
+        if (typeof markdown !== "string") return false;
+
+        const fragment = PMDOMSerializer.fromSchema(view.state.schema)
+          .serializeFragment(slice.content);
+        const wrapper = document.createElement("div");
+        wrapper.appendChild(fragment);
+        const html = wrapper.innerHTML;
+
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+          void navigator.clipboard.write([
+            new ClipboardItem({
+              "text/plain": new Blob([markdown], { type: "text/plain" }),
+              "text/html": new Blob([html], { type: "text/html" }),
+            }),
+          ]);
+        } else if (navigator.clipboard?.writeText) {
+          void navigator.clipboard.writeText(markdown);
+        } else {
+          return false;
+        }
+
+        return true;
+      },
+    };
+  },
+});
+
 const extensions = [
   starterKit,
   Placeholder,
@@ -218,6 +266,8 @@ const extensions = [
   TaskItem.configure({ nested: true }),
   TiptapUnderline,
   HighlightExtension,
+  TextStyle,
+  Color,
   CustomKeymap,
   slashCommand,
   Table.configure({
@@ -236,6 +286,7 @@ const extensions = [
     transformPastedText: true,
     transformCopiedText: false,
   }),
+  CopyAsMarkdown,
 ];
 
 // --- Link popover button (shared by toolbar + bubble menu) ---
@@ -318,6 +369,270 @@ const LinkPopoverButton = ({ className }: { className?: string }) => {
   );
 };
 
+// --- Color popover button (text color + highlight, shared by toolbar + bubble menu) ---
+
+type Preset = { name: string; value: string | null };
+
+const PRESET_TEXT_COLORS: Preset[] = [
+  { name: "Default", value: null },
+  { name: "Red", value: "#e53935" },
+  { name: "Orange", value: "#fb8c00" },
+  { name: "Yellow", value: "#fdd835" },
+  { name: "Green", value: "#43a047" },
+  { name: "Blue", value: "#1e88e5" },
+  { name: "Purple", value: "#8e24aa" },
+  { name: "Black", value: "#1f2937" },
+  { name: "Gray", value: "#757575" },
+];
+
+const PRESET_HIGHLIGHT_COLORS: Preset[] = [
+  { name: "None", value: null },
+  { name: "Red", value: "#ff0000" },
+  { name: "Orange", value: "#fb8c00" },
+  { name: "Yellow", value: "#fdd835" },
+  { name: "Green", value: "#43a047" },
+  { name: "Blue", value: "#1e88e5" },
+  { name: "Purple", value: "#8e24aa" },
+  { name: "Black", value: "#1f2937" },
+  { name: "Gray", value: "#757575" },
+];
+
+type ColorPreset = { name: string; highlight: string | null; text: string | null };
+
+// Highlight backgrounds mirror PRESET_HIGHLIGHT_COLORS; each text color is chosen for
+// WCAG AA contrast (>=4.5:1) against its highlight. Light backgrounds -> black text,
+// dark backgrounds -> white text. Pure #000/#fff are used (not the #1f2937 text preset,
+// which fails AA on red/blue).
+const PRESET_COMBOS: ColorPreset[] = [
+  { name: "None", highlight: null, text: null }, // clears both
+  { name: "Red", highlight: "#ff0000", text: "#000000" }, // 5.25:1
+  { name: "Orange", highlight: "#fb8c00", text: "#000000" }, // 8.84:1
+  { name: "Yellow", highlight: "#fdd835", text: "#000000" }, // 15.0:1
+  { name: "Green", highlight: "#43a047", text: "#000000" }, // 6.35:1
+  { name: "Blue", highlight: "#1e88e5", text: "#000000" }, // 5.70:1
+  { name: "Purple", highlight: "#8e24aa", text: "#ffffff" }, // 7.04:1
+  { name: "Black", highlight: "#1f2937", text: "#ffffff" }, // 14.7:1
+  { name: "Gray", highlight: "#757575", text: "#ffffff" }, // 4.6:1
+];
+
+const ColorSwatchGrid = ({
+  presets,
+  current,
+  onPick,
+  kind,
+}: {
+  presets: Preset[];
+  current: string | null;
+  onPick: (color: string | null) => void;
+  kind: "text" | "highlight";
+}) => {
+  const normalize = (v: string | null) => (v ? v.toLowerCase() : null);
+  const currentNorm = normalize(current);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-3 gap-1">
+        {presets.map((p, i) => {
+          const isCurrent = normalize(p.value) === currentNorm;
+          const isClear = p.value === null;
+          return (
+            <button
+              key={i}
+              type="button"
+              title={p.name}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onPick(p.value)}
+              className={`flex h-8 cursor-pointer items-center justify-center gap-1 rounded border text-xs ${isCurrent ? "ring-2 ring-primary" : ""}`}
+              style={
+                isClear
+                  ? undefined
+                  : kind === "text"
+                    ? { color: p.value ?? undefined }
+                    : { backgroundColor: p.value ?? undefined }
+              }
+            >
+              {isClear ? <Ban className="h-3.5 w-3.5" /> : kind === "text" ? "A" : <span className="px-1">A</span>}
+            </button>
+          );
+        })}
+      </div>
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="color"
+          value={current ?? "#000000"}
+          onChange={(e) => onPick(e.target.value)}
+          className="h-7 w-7 cursor-pointer rounded border bg-transparent p-0"
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+        <span>Custom…</span>
+      </label>
+    </div>
+  );
+};
+
+const PresetSwatchGrid = ({
+  presets,
+  currentText,
+  currentHighlight,
+  onPick,
+}: {
+  presets: ColorPreset[];
+  currentText: string | null;
+  currentHighlight: string | null;
+  onPick: (preset: ColorPreset) => void;
+}) => {
+  const normalize = (v: string | null) => (v ? v.toLowerCase() : null);
+  const textNorm = normalize(currentText);
+  const highlightNorm = normalize(currentHighlight);
+
+  return (
+    <div className="grid grid-cols-3 gap-1">
+      {presets.map((p, i) => {
+        const isCurrent = normalize(p.highlight) === highlightNorm && normalize(p.text) === textNorm;
+        const isClear = p.highlight === null && p.text === null;
+
+        return (
+          <button
+            key={i}
+            type="button"
+            title={p.name}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onPick(p)}
+            className={`flex h-8 cursor-pointer items-center justify-center gap-1 rounded border text-xs ${isCurrent ? "ring-2 ring-primary" : ""}`}
+            style={isClear ? undefined : { backgroundColor: p.highlight ?? undefined, color: p.text ?? undefined }}
+          >
+            {isClear ? <Ban className="h-3.5 w-3.5" /> : <span className="px-1 font-medium">A</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const ColorPopoverButton = ({ className }: { className?: string }) => {
+  const { editor } = useEditor();
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"presets" | "text" | "highlight">("presets");
+
+  if (!editor) return null;
+
+  const currentTextColor: string | null = editor.getAttributes("textStyle").color ?? null;
+  const currentHighlight: string | null = editor.getAttributes("highlight").color ?? null;
+  const hasAny = Boolean(currentTextColor || currentHighlight);
+
+  const normalize = (v: string | null) => (v ? v.toLowerCase() : null);
+
+  const matchedPreset = PRESET_COMBOS.find(
+    (p) =>
+      normalize(p.highlight) === normalize(currentHighlight) && normalize(p.text) === normalize(currentTextColor),
+  );
+
+  // Default to Presets when nothing is set (matches the None preset) or the current
+  // text+highlight pair is a known preset; otherwise fall back to whichever single
+  // attribute is set (highlight wins when both are set but the pair isn't a preset).
+  const computeDefaultTab = (): "presets" | "text" | "highlight" => {
+    if (matchedPreset) return "presets";
+
+    return currentHighlight ? "highlight" : "text";
+  };
+
+  const applyText = (color: string | null) => {
+    if (color === null) editor.chain().focus().unsetColor().run();
+    else editor.chain().focus().setColor(color).run();
+  };
+
+  const applyHighlight = (color: string | null) => {
+    if (color === null) editor.chain().focus().unsetHighlight().run();
+    else editor.chain().focus().setHighlight({ color }).run();
+  };
+
+  const applyPreset = (p: ColorPreset) => {
+    let chain = editor.chain().focus();
+
+    chain = p.highlight === null ? chain.unsetHighlight() : chain.setHighlight({ color: p.highlight });
+    chain = p.text === null ? chain.unsetColor() : chain.setColor(p.text);
+
+    chain.run();
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setTab(computeDefaultTab());
+        setOpen(next);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          className={`h-8 w-8 cursor-pointer p-0 ${hasAny ? "bg-accent" : ""} ${className ?? ""}`}
+          title="Color"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <Palette className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-56 p-2"
+        side="bottom"
+        align="start"
+        onFocusOutside={(e) => e.preventDefault()}
+      >
+        <div className="mb-2 flex gap-1 border-b">
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setTab("presets")}
+            className={`cursor-pointer px-3 py-1 text-sm ${tab === "presets" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
+          >
+            Presets
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setTab("text")}
+            className={`cursor-pointer px-3 py-1 text-sm ${tab === "text" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
+          >
+            Text
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setTab("highlight")}
+            className={`cursor-pointer px-3 py-1 text-sm ${tab === "highlight" ? "border-b-2 border-primary font-medium" : "text-muted-foreground"}`}
+          >
+            Highlight
+          </button>
+        </div>
+        {tab === "presets" ? (
+          <PresetSwatchGrid
+            presets={PRESET_COMBOS}
+            currentText={currentTextColor}
+            currentHighlight={currentHighlight}
+            onPick={applyPreset}
+          />
+        ) : tab === "text" ? (
+          <ColorSwatchGrid
+            presets={PRESET_TEXT_COLORS}
+            current={currentTextColor}
+            onPick={applyText}
+            kind="text"
+          />
+        ) : (
+          <ColorSwatchGrid
+            presets={PRESET_HIGHLIGHT_COLORS}
+            current={currentHighlight}
+            onPick={applyHighlight}
+            kind="highlight"
+          />
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 // --- Formatting toolbar (works on mobile + desktop) ---
 
 const EditorToolbar = ({ onAttach }: { onAttach?: () => void }) => {
@@ -375,6 +690,7 @@ const EditorToolbar = ({ onAttach }: { onAttach?: () => void }) => {
         "Inline code"
       )}
       <LinkPopoverButton />
+      <ColorPopoverButton />
 
       <Separator orientation="vertical" className="mx-1 h-6" />
 
@@ -931,6 +1247,7 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
               </EditorBubbleItem>
               <Separator orientation="vertical" className="h-6" />
               <LinkPopoverButton className="rounded-none" />
+              <ColorPopoverButton className="rounded-none" />
             </EditorBubble>
 
             {canEdit && <TableBubbleMenu />}
