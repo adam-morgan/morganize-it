@@ -1,8 +1,12 @@
 import { from, map, Observable, switchMap } from "rxjs";
 import { apiPost } from "@/utils/fetch";
-import { getCacheDb, getLastSync, setLastSync, clearCache } from "./cache-db";
+import { getCacheDb, getLastSync, setLastSync, clearEntityCache } from "./cache-db";
+import { getQueueProcessor } from "./queue-processor";
+import { cacheMissingAttachments } from "./attachment-cache";
 
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const isOnline = (): boolean => typeof navigator === "undefined" || navigator.onLine;
 
 export type SyncResult = {
   notebooks: SyncNotebook[];
@@ -13,14 +17,21 @@ export class SyncManager {
   constructor(private userId: string) {}
 
   sync(): Observable<SyncResult> {
-    return from(getLastSync(this.userId)).pipe(
+    // Flush local offline writes BEFORE pulling, so the incoming sync echoes our
+    // edits back instead of clobbering them. This is the single chokepoint that
+    // every sync trigger (visibility, poll, realtime push, share, startup) funnels
+    // through, so it's the only place this ordering needs to be enforced.
+    return from(getQueueProcessor(this.userId).flushIfOnline()).pipe(
+      switchMap(() => from(getLastSync(this.userId))),
       switchMap((lastSync) => {
         const isStale =
           lastSync != null &&
           Date.now() - new Date(lastSync).getTime() > STALE_THRESHOLD_MS;
 
-        if (isStale) {
-          return from(clearCache(this.userId)).pipe(
+        // Only clear-and-refetch when we can actually reach the server. Clearing
+        // while offline would wipe the cache the user is relying on offline.
+        if (isStale && isOnline()) {
+          return from(clearEntityCache(this.userId)).pipe(
             switchMap(() => this.fetchAndApply(null))
           );
         }
@@ -108,9 +119,16 @@ export class SyncManager {
     const currentNotebooks = (await db.getAll("notebooks")) as SyncNotebook[];
     const currentNotes = (await db.getAll("notes")) as SyncNote[];
 
+    const liveNotes = currentNotes.filter((n) => !n.deletedAt);
+
+    // Eagerly cache attachment blobs in the background so they're available
+    // offline. Best-effort and online-only (we only reach here after a
+    // successful pull), so failures never affect the sync result.
+    void cacheMissingAttachments(this.userId, liveNotes).catch(() => {});
+
     return {
       notebooks: currentNotebooks.filter((n) => !n.deletedAt),
-      notes: currentNotes.filter((n) => !n.deletedAt),
+      notes: liveNotes,
     };
   }
 }

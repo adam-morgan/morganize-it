@@ -5,8 +5,8 @@ import { getCacheDb } from "./cache-db";
 
 export class CachedNotesService implements NotesService {
   constructor(
-    private api: ApiNotesService,
-    private userId: string
+    protected api: ApiNotesService,
+    protected userId: string
   ) {}
 
   getNotebooks(): Observable<Notebook[]> {

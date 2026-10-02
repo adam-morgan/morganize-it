@@ -3,6 +3,8 @@ import { ReactiveTestDef } from "../../util/reactive-service-tests";
 import { runGenericTests } from "../../util/reactive-tests";
 import { firstValueFrom } from "rxjs";
 import { v4 as uuid } from "uuid";
+import request from "supertest";
+import app from "@/server/express/restApi";
 
 describe("NoteService", () => {
   const svc = getNoteService();
@@ -121,6 +123,45 @@ describe("NoteService", () => {
         svc.find({ criteria: { notebookId: notebook.id } })
       );
       expect(notesAfter.items.length).toBe(0);
+    });
+  });
+
+  // Offline support depends on the server accepting a client-generated id on
+  // create so queued offline creates keep their id when replayed. If this ever
+  // regresses, offline-created notes would duplicate on sync.
+  describe("Client-supplied id (offline create)", () => {
+    it("preserves a client id through POST /api/notes and GET", async () => {
+      const login = await request(app)
+        .post("/api/auth/login")
+        .send({ email: "user6@gmail.com", password: "password6" });
+      const token = login.body.token as string;
+
+      const clientId = uuid();
+
+      const created = await request(app)
+        .post("/api/notes")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          id: clientId,
+          title: "Offline Note",
+          content: "",
+          textContent: "",
+          notebookId: "notebook1",
+          userId: "user6",
+          createdAt: now,
+          updatedAt: now,
+          lastOpenedAt: now,
+        });
+
+      expect(created.status).toBe(201);
+      expect(created.body.id).toBe(clientId);
+
+      const fetched = await request(app)
+        .get(`/api/notes/${clientId}`)
+        .set("Authorization", `Bearer ${token}`);
+
+      expect(fetched.status).toBe(200);
+      expect(fetched.body.id).toBe(clientId);
     });
   });
 });

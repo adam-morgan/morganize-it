@@ -15,7 +15,7 @@ export const apiPatch = <Req, Resp>(path: string, body: Req): Observable<Resp> =
 export const apiDelete = <Resp>(path: string): Observable<Resp> =>
   apiRequest("DELETE", path);
 
-const getAuthToken = (): string | null => {
+export const getAuthToken = (): string | null => {
   return localStorage.getItem("authToken");
 };
 
@@ -125,12 +125,31 @@ const apiRequest = <Req, Resp>(method: string, path: string, body?: Req): Observ
   );
 };
 
+// Error thrown for non-2xx HTTP responses. Carries the status code so callers
+// (notably the offline mutation queue) can distinguish a 404/409 from a 5xx or
+// a network failure. Existing callers continue to read `.message` unchanged.
+export interface ApiRequestError extends Error {
+  status: number;
+}
+
 const handleResponse = <Resp>(response: Response): Observable<Resp> => {
   if (response.ok) {
     return from(response.text()).pipe(map((text) => (!text ? undefined : JSON.parse(text))));
   }
 
-  return from(response.json()).pipe(
-    switchMap((error) => throwError(() => Error(error.message)))
+  return from(response.text()).pipe(
+    switchMap((text) => {
+      let message = text;
+      try {
+        message = JSON.parse(text).message ?? text;
+      } catch {
+        // Body wasn't JSON — fall back to the raw text.
+      }
+
+      const error = new Error(message) as ApiRequestError;
+      error.status = response.status;
+
+      return throwError(() => error);
+    })
   );
 };
