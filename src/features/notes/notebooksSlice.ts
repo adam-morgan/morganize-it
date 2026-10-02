@@ -11,10 +11,27 @@ type NotebooksSlice = {
   notebooks: SyncNotebook[];
   initialize: () => Observable<void>;
   resync: () => Observable<void>;
+  fullResync: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
   updateNotebook: (id: string, name: string) => Observable<Notebook>;
   deleteNotebook: (id: string) => Observable<void>;
   reset: () => void;
+};
+
+const groupByNotebook = (notes: SyncNote[]): Record<string, SyncNote[]> => {
+  const notesByNotebook: Record<string, SyncNote[]> = {};
+
+  for (const note of notes) {
+    (notesByNotebook[note.notebookId] ??= []).push(note);
+  }
+
+  return notesByNotebook;
+};
+
+const replaceWithSyncResult = (result: SyncResult) => {
+  useNotebooksSlice.setState({ notebooks: result.notebooks });
+  useNotesSlice.setState({ notes: groupByNotebook(result.notes) });
+  useRecentNotesSlice.getState().reset();
 };
 
 const applySyncResult = (result: SyncResult) => {
@@ -54,6 +71,23 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
     return syncManager.sync().pipe(
       take(1),
       tap((result) => applySyncResult(result)),
+      map(() => undefined)
+    );
+  },
+  fullResync: () => {
+    const user = useAuthSlice.getState().user;
+    const syncManager = user && !(user as GuestUser).isGuest ? getSyncManager(user as User) : null;
+
+    if (!syncManager) {
+      return of(undefined);
+    }
+
+    return syncManager.fullResync().pipe(
+      take(1),
+      tap((result) => {
+        replaceWithSyncResult(result);
+        set({ initialized: true });
+      }),
       map(() => undefined)
     );
   },

@@ -1,7 +1,14 @@
 import { from, map, Observable, switchMap } from "rxjs";
 import { apiPost } from "@/utils/fetch";
-import { getCacheDb, getLastSync, setLastSync, clearEntityCache } from "./cache-db";
+import {
+  getCacheDb,
+  getLastSync,
+  setLastSync,
+  clearEntityCache,
+  replaceEntityCache,
+} from "./cache-db";
 import { getQueueProcessor } from "./queue-processor";
+import { counts } from "./mutation-queue";
 import { cacheMissingAttachments } from "./attachment-cache";
 
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -38,6 +45,13 @@ export class SyncManager {
 
         return this.fetchAndApply(lastSync);
       })
+    );
+  }
+
+  fullResync(): Observable<SyncResult> {
+    return from(this.pushPendingChanges()).pipe(
+      switchMap(() => apiPost<{ lastSync?: string }, SyncResponse>("/sync", {})),
+      switchMap((response) => from(this.replaceAll(response)))
     );
   }
 
@@ -95,19 +109,10 @@ export class SyncManager {
     }
     await noteTx.done;
 
-    // Update lastSync from max updatedAt of owned items only
-    const ownedTimestamps = [
-      ...response.notebooks
-        .filter((n) => n.userId === this.userId)
-        .map((n) => n.updatedAt),
-      ...response.notes
-        .filter((n) => n.userId === this.userId)
-        .map((n) => n.updatedAt),
-    ].filter(Boolean);
+    const latestOwned = this.latestOwnedTimestamp(response);
 
-    if (ownedTimestamps.length > 0) {
-      const maxTimestamp = ownedTimestamps.sort().pop()!;
-      await setLastSync(this.userId, maxTimestamp);
+    if (latestOwned) {
+      await setLastSync(this.userId, latestOwned);
     } else if (response.notebooks.length === 0 && response.notes.length === 0) {
       const lastSync = await getLastSync(this.userId);
       if (!lastSync) {
@@ -115,7 +120,48 @@ export class SyncManager {
       }
     }
 
-    // Read full current state from IDB
+    return this.readCurrentState();
+  }
+
+  private async pushPendingChanges(): Promise<void> {
+    if (!isOnline()) {
+      throw new Error("You're offline. Reconnect to resync your data.");
+    }
+
+    await getQueueProcessor(this.userId).flush();
+
+    const { pending } = await counts(this.userId);
+
+    if (pending > 0) {
+      throw new Error(
+        `${pending} local change${pending === 1 ? "" : "s"} couldn't be pushed to the server yet. Try again shortly.`
+      );
+    }
+  }
+
+  private async replaceAll(response: SyncResponse): Promise<SyncResult> {
+    await replaceEntityCache(
+      this.userId,
+      response.notebooks.filter((nb) => !nb.deletedAt),
+      response.notes.filter((note) => !note.deletedAt),
+      this.latestOwnedTimestamp(response) ?? new Date().toISOString()
+    );
+
+    return this.readCurrentState();
+  }
+
+  private latestOwnedTimestamp(response: SyncResponse): string | undefined {
+    return [
+      ...response.notebooks.filter((n) => n.userId === this.userId).map((n) => n.updatedAt),
+      ...response.notes.filter((n) => n.userId === this.userId).map((n) => n.updatedAt),
+    ]
+      .filter(Boolean)
+      .sort()
+      .pop();
+  }
+
+  private async readCurrentState(): Promise<SyncResult> {
+    const db = await getCacheDb(this.userId);
     const currentNotebooks = (await db.getAll("notebooks")) as SyncNotebook[];
     const currentNotes = (await db.getAll("notes")) as SyncNote[];
 

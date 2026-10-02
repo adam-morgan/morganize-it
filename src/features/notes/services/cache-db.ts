@@ -94,6 +94,29 @@ export const clearEntityCache = async (userId: string): Promise<void> => {
   ]);
 };
 
+export const replaceEntityCache = async (
+  userId: string,
+  notebooks: SyncNotebook[],
+  notes: SyncNote[],
+  lastSync: string | null
+): Promise<void> => {
+  const db = await getCacheDb(userId);
+  const tx = db.transaction(["notebooks", "notes", "meta"], "readwrite");
+  const notebookStore = tx.objectStore("notebooks");
+  const noteStore = tx.objectStore("notes");
+  const metaStore = tx.objectStore("meta");
+
+  await Promise.all([notebookStore.clear(), noteStore.clear(), metaStore.clear()]);
+
+  await Promise.all([
+    ...notebooks.map((nb) => notebookStore.put(nb)),
+    ...notes.map((note) => noteStore.put(note)),
+    ...(lastSync ? [metaStore.put({ key: "lastSync", value: lastSync })] : []),
+  ]);
+
+  await tx.done;
+};
+
 // Full wipe of everything for this user, including the mutation queue and cached
 // attachments. Use on logout only — never for routine re-syncs.
 export const clearCache = async (userId: string): Promise<void> => {

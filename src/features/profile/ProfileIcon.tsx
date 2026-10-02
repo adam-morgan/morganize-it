@@ -91,6 +91,25 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
     e.target.value = "";
   };
 
+  const handleResync = () => {
+    const unmask = mask("Resyncing data...");
+
+    useNotebooksSlice.getState().fullResync()
+      .pipe(take(1))
+      .subscribe({
+        complete: () => {
+          unmask();
+          useAlertSlice.getState().successAlert("Data resynced from the server");
+        },
+        error: (err) => {
+          unmask();
+          useAlertSlice.getState().errorAlert(
+            `Resync failed: ${err instanceof Error ? err.message : "Unknown error"}`
+          );
+        },
+      });
+  };
+
   const handleLogout = () => {
     logout().subscribe({
       complete: () => navigate("/login"),
@@ -158,6 +177,8 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+
+              <DropdownMenuItem onClick={handleResync}>Resync Data</DropdownMenuItem>
 
               <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
             </>
