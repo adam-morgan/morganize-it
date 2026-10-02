@@ -1,6 +1,6 @@
 import { IDBPDatabase, openDB } from "idb";
 
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 const getDbName = (userId: string) => `morganizeit-cache-${userId}`;
 
@@ -55,6 +55,12 @@ export const getCacheDb = (userId: string): Promise<IDBPDatabase> => {
           tx.objectStore("notebooks").clear();
           tx.objectStore("notes").clear();
           tx.objectStore("meta").clear();
+        }
+
+        // v6: force one full re-sync to recover notebooks dropped from the cache by
+        // the shadow-notebook sync bug.
+        if (oldVersion > 0 && oldVersion < 6) {
+          tx.objectStore("meta").delete("lastSync");
         }
       },
     });
