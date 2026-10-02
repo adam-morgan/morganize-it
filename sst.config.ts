@@ -9,7 +9,7 @@ export default $config({
       providers: {
         aws: {
           region: "ca-central-1",
-          profile: "personal",
+          profile: process.env.GITHUB_ACTIONS ? undefined : "personal",
         },
       },
     };
