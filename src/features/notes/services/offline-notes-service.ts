@@ -30,16 +30,18 @@ export class OfflineNotesService extends CachedNotesService {
   createNotebook(name: string): Observable<Notebook> {
     const now = new Date().toISOString();
 
-    const notebook: SyncNotebook = {
+    const notebook: Notebook = {
       id: uuid(),
       name,
       userId: this.userId,
       updatedAt: now,
-      deletedAt: null,
-      accessLevel: "owner",
     };
 
-    return from(this.persistCreate("notebooks", "notebook", notebook)).pipe(map(() => notebook));
+    const cached: SyncNotebook = { ...notebook, accessLevel: "owner" };
+
+    return from(this.persistCreate("notebooks", "notebook", cached, notebook)).pipe(
+      map(() => notebook)
+    );
   }
 
   updateNotebook(id: string, name: string): Observable<Notebook> {
@@ -71,7 +73,8 @@ export class OfflineNotesService extends CachedNotesService {
   private async persistCreate(
     store: "notebooks" | "notes",
     entityType: "notebook" | "note",
-    entity: { id: string; notebookId?: string }
+    entity: { id: string; notebookId?: string },
+    payload: object = entity
   ): Promise<void> {
     const db = await getCacheDb(this.userId);
     await db.put(store, entity);
@@ -80,7 +83,7 @@ export class OfflineNotesService extends CachedNotesService {
       this.userId,
       entityType,
       entity.id,
-      entity as unknown as Record<string, unknown>,
+      payload as Record<string, unknown>,
       entity.notebookId
     );
     this.afterWrite();

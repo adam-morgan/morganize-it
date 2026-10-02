@@ -1,7 +1,7 @@
 import { map, Observable, of, switchMap, throwError } from "rxjs";
 import { PermissionResolver } from "@/server/permissions";
 import { getShareAccessService } from "@/server/features/shares";
-import { NotFoundError } from "@/server/errors";
+import { ConflictError, NotFoundError } from "@/server/errors";
 import { getNotebookService } from "../services";
 
 export class NotebookPermissionResolver implements PermissionResolver<Notebook> {
@@ -12,7 +12,13 @@ export class NotebookPermissionResolver implements PermissionResolver<Notebook> 
 
     return getNotebookService()
       .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
-      .pipe(map((result) => result.items.length === 0));
+      .pipe(
+        switchMap((result) =>
+          result.items.length === 0
+            ? of(true)
+            : throwError(() => new ConflictError("Notebook already exists"))
+        )
+      );
   }
 
   canUpdate(userId: string, entity: Notebook): Observable<boolean> {

@@ -1,7 +1,7 @@
 import { map, Observable, of, switchMap, throwError } from "rxjs";
 import { PermissionResolver } from "@/server/permissions";
 import { getShareAccessService } from "@/server/features/shares";
-import { NotFoundError } from "@/server/errors";
+import { ConflictError, NotFoundError } from "@/server/errors";
 import { getNoteService } from "../services";
 
 export class NotePermissionResolver implements PermissionResolver<Note> {
@@ -13,17 +13,18 @@ export class NotePermissionResolver implements PermissionResolver<Note> {
     const idAvailable$ = entity.id
       ? getNoteService()
           .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
-          .pipe(map((result) => result.items.length === 0))
-      : of(true);
+          .pipe(
+            switchMap((result) =>
+              result.items.length === 0
+                ? of(undefined)
+                : throwError(() => new ConflictError("Note already exists"))
+            )
+          )
+      : of(undefined);
 
     return idAvailable$.pipe(
-      switchMap((available) =>
-        available
-          ? getShareAccessService()
-              .getNotebookAccess(userId, entity.notebookId)
-              .pipe(map((level) => level === "owner" || level === "readwrite"))
-          : of(false)
-      )
+      switchMap(() => getShareAccessService().getNotebookAccess(userId, entity.notebookId)),
+      map((level) => level === "owner" || level === "readwrite")
     );
   }
 

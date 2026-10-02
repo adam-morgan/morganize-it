@@ -439,7 +439,7 @@ describe("Express - Shares & Shared Resources", () => {
         .set("Authorization", `Bearer ${bobToken}`)
         .send({ id: notebookId, name: "Copy", userId: bobId });
 
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(409);
     });
 
     it("owner can restore a trashed notebook and then share it", async () => {
