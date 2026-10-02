@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { firstValueFrom } from "rxjs";
+import { v4 as uuid } from "uuid";
 import { Upload, X, Check, Loader2, AlertCircle, Pencil } from "lucide-react";
 import {
   Dialog,
@@ -15,6 +16,12 @@ import {
   confirmUpload,
   uploadFileToUrl,
 } from "../services/attachment-service";
+import { putAttachmentBlob } from "../services/attachment-cache";
+import { enqueueAttachmentUpload } from "../services/mutation-queue";
+import { getQueueProcessor } from "../services";
+import { getCacheDb } from "../services/cache-db";
+import { useAuthSlice } from "@/features/auth";
+import { useNetworkSlice } from "@/features/network/networkSlice";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
@@ -48,6 +55,10 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
   const [editingValue, setEditingValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const user = useAuthSlice((s) => s.user);
+  const online = useNetworkSlice((s) => s.online);
+  const userId = user && !(user as GuestUser).isGuest ? (user.id as string) : null;
 
   useEffect(() => {
     if (editingIndex !== null) {
@@ -130,20 +141,78 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
     [addFiles]
   );
 
-  const handleUpload = async () => {
-    const valid = files.filter((f) => !f.error && f.status === "pending");
-    if (valid.length === 0) return;
+  const setStatus = (index: number, status: FileStatus, error?: string) => {
+    setFiles((prev) => prev.map((f, idx) => (idx === index ? { ...f, status, error } : f)));
+  };
 
-    setUploading(true);
+  // Offline: store the blob locally, queue the upload for replay, and
+  // optimistically append the attachment to the cached note so it's usable now.
+  const uploadOffline = async (): Promise<void> => {
     let latestNote: Note | null = null;
 
     for (let i = 0; i < files.length; i++) {
       const entry = files[i];
       if (entry.error || entry.status !== "pending") continue;
 
-      setFiles((prev) =>
-        prev.map((f, idx) => (idx === i ? { ...f, status: "uploading" } : f))
-      );
+      setStatus(i, "uploading");
+
+      try {
+        const tempId = uuid();
+        const mimeType = entry.file.type || "application/octet-stream";
+
+        const stored = await putAttachmentBlob(userId!, noteId, tempId, entry.file, entry.displayName, mimeType);
+        if (!stored) {
+          throw new Error("File too large to store offline");
+        }
+
+        await enqueueAttachmentUpload(userId!, noteId, tempId, entry.displayName, mimeType);
+
+        const db = await getCacheDb(userId!);
+        const note = (await db.get("notes", noteId)) as Note | undefined;
+        const updated = {
+          ...(note ?? { id: noteId }),
+          attachments: [...(note?.attachments ?? []), { id: tempId, filename: entry.displayName, mimeType }],
+        } as Note;
+        await db.put("notes", updated);
+        latestNote = updated;
+
+        setStatus(i, "done");
+      } catch (err) {
+        setStatus(i, "error", (err as Error).message);
+      }
+    }
+
+    setUploading(false);
+    void getQueueProcessor(user as User)?.refreshCounts();
+    if (latestNote) {
+      onUploaded(latestNote);
+    }
+  };
+
+  const handleUpload = async () => {
+    const valid = files.filter((f) => !f.error && f.status === "pending");
+    if (valid.length === 0) return;
+
+    setUploading(true);
+
+    if (!online && userId) {
+      await uploadOffline();
+      return;
+    }
+
+    // Online: ensure any queued note-create has flushed so the note exists
+    // server-side before we request upload URLs for it.
+    if (userId) {
+      await getQueueProcessor(user as User)?.flushIfOnline();
+    }
+
+    let latestNote: Note | null = null;
+
+    for (let i = 0; i < files.length; i++) {
+      const entry = files[i];
+      if (entry.error || entry.status !== "pending") continue;
+
+      setStatus(i, "uploading");
 
       try {
         const { uploadUrl, fileId } = await firstValueFrom(
@@ -155,15 +224,21 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
         );
         latestNote = updated;
 
-        setFiles((prev) =>
-          prev.map((f, idx) => (idx === i ? { ...f, status: "done" } : f))
-        );
+        // Cache the bytes we already have so the attachment opens offline later.
+        if (userId) {
+          void putAttachmentBlob(
+            userId,
+            noteId,
+            fileId,
+            entry.file,
+            entry.displayName,
+            entry.file.type || "application/octet-stream"
+          ).catch(() => {});
+        }
+
+        setStatus(i, "done");
       } catch (err) {
-        setFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === i ? { ...f, status: "error", error: (err as Error).message } : f
-          )
-        );
+        setStatus(i, "error", (err as Error).message);
       }
     }
 

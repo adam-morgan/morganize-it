@@ -1,6 +1,6 @@
 import { IDBPDatabase, openDB } from "idb";
 
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const getDbName = (userId: string) => `morganizeit-cache-${userId}`;
 
@@ -25,6 +25,22 @@ export const getCacheDb = (userId: string): Promise<IDBPDatabase> => {
 
         if (!db.objectStoreNames.contains("meta")) {
           db.createObjectStore("meta", { keyPath: "key" });
+        }
+
+        // v5: offline write queue + attachment blob cache. Purely additive — we
+        // must NOT touch the existing notebooks/notes/meta stores here, so an
+        // online user's valid v4 cache survives the 4 -> 5 upgrade untouched.
+        if (!db.objectStoreNames.contains("mutations")) {
+          const mutations = db.createObjectStore("mutations", { keyPath: "id" });
+          mutations.createIndex("timestamp", "timestamp");
+          mutations.createIndex("entityId", "entityId");
+          mutations.createIndex("status", "status");
+        }
+
+        if (!db.objectStoreNames.contains("attachments")) {
+          const attachments = db.createObjectStore("attachments", { keyPath: "key" });
+          attachments.createIndex("noteId", "noteId");
+          attachments.createIndex("lastAccess", "lastAccess");
         }
 
         // v4: unified stores — drop separate shared stores from v2/v3 and
@@ -58,13 +74,34 @@ export const setLastSync = async (userId: string, timestamp: string): Promise<vo
   await db.put("meta", { key: "lastSync", value: timestamp });
 };
 
-export const clearCache = async (userId: string): Promise<void> => {
+// Clears the cached entities + sync metadata but PRESERVES the offline mutation
+// queue and cached attachment blobs. Used by the stale-cache path so a forced
+// full re-sync never discards unflushed local work or downloaded attachments.
+export const clearEntityCache = async (userId: string): Promise<void> => {
   const db = await getCacheDb(userId);
   const tx = db.transaction(["notebooks", "notes", "meta"], "readwrite");
   await Promise.all([
     tx.objectStore("notebooks").clear(),
     tx.objectStore("notes").clear(),
     tx.objectStore("meta").clear(),
+    tx.done,
+  ]);
+};
+
+// Full wipe of everything for this user, including the mutation queue and cached
+// attachments. Use on logout only — never for routine re-syncs.
+export const clearCache = async (userId: string): Promise<void> => {
+  const db = await getCacheDb(userId);
+  const tx = db.transaction(
+    ["notebooks", "notes", "meta", "mutations", "attachments"],
+    "readwrite"
+  );
+  await Promise.all([
+    tx.objectStore("notebooks").clear(),
+    tx.objectStore("notes").clear(),
+    tx.objectStore("meta").clear(),
+    tx.objectStore("mutations").clear(),
+    tx.objectStore("attachments").clear(),
     tx.done,
   ]);
 };

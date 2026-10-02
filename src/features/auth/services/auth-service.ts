@@ -1,5 +1,30 @@
-import { apiGet, apiPost, setAuthToken, setRefreshToken } from "@/utils/fetch";
+import { apiGet, apiPost, getAuthToken, setAuthToken, setRefreshToken } from "@/utils/fetch";
 import { catchError, map, Observable, of, tap } from "rxjs";
+
+const CACHED_USER_KEY = "authUser";
+
+// Persist the signed-in user so the session can be restored offline (when
+// /auth/whoami can't be reached) without bouncing to the login screen.
+const setCachedUser = (user?: User) => {
+  if (user) {
+    localStorage.setItem(CACHED_USER_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(CACHED_USER_KEY);
+  }
+};
+
+const getCachedUser = (): User | undefined => {
+  const raw = localStorage.getItem(CACHED_USER_KEY);
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return undefined;
+  }
+};
 
 const storeTokens = (response: { token?: string; refreshToken?: string }) => {
   if (response.token) {
@@ -18,7 +43,22 @@ class AuthService {
     }
 
     return apiGet<User>("/auth/whoami").pipe(
-      catchError(() => of(undefined))
+      tap((user) => setCachedUser(user)),
+      catchError((err: unknown) => {
+        // A real auth failure (e.g. 401) carries an HTTP status → force login.
+        // A network failure (offline) has no status → restore the last known
+        // user so the cached app stays usable offline.
+        const status =
+          err && typeof err === "object" && "status" in err
+            ? (err as { status?: number }).status
+            : undefined;
+
+        if (status === undefined && getAuthToken()) {
+          return of(getCachedUser());
+        }
+
+        return of(undefined);
+      })
     );
   }
 
@@ -32,6 +72,7 @@ class AuthService {
       tap((response) => {
         localStorage.removeItem("guestMode");
         storeTokens(response);
+        setCachedUser(response.user);
       })
     );
   }
@@ -42,6 +83,7 @@ class AuthService {
     const clearLocal = () => {
       setAuthToken(null);
       setRefreshToken(null);
+      setCachedUser(undefined);
       localStorage.removeItem("guestMode");
     };
 
@@ -62,6 +104,7 @@ class AuthService {
       tap((response) => {
         localStorage.removeItem("guestMode");
         storeTokens(response);
+        setCachedUser(response.user);
       })
     );
   }
@@ -74,6 +117,7 @@ class AuthService {
       tap((response) => {
         localStorage.removeItem("guestMode");
         storeTokens(response);
+        setCachedUser(response.user);
       })
     );
   }

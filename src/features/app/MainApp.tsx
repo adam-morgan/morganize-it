@@ -19,6 +19,8 @@ import RecentNotes from "../notes/containers/RecentNotes";
 import GlobalSearchDialog from "../notes/search/GlobalSearchDialog";
 import { FriendsView, useFriendsSlice } from "../friends";
 import { useAuthSlice } from "../auth";
+import { useNetworkStatus } from "../network/useNetworkStatus";
+import OfflineIndicator from "../network/OfflineIndicator";
 import { Routes, Route, Link, useMatch } from "react-router-dom";
 
 const WelcomeView = () => (
@@ -62,12 +64,14 @@ const MainApp = () => {
   const isGuest = (user as GuestUser | undefined)?.isGuest === true;
 
   useAppSync();
+  useNetworkStatus();
 
   useEffectOnMount(() => {
     initialize(breakpoint);
     reactiveQuery(initializeNotebooks, "Loading...", () => {});
     if (!isGuest) {
-      initializeFriends().subscribe();
+      // Friends are network-only; offline this just fails quietly.
+      initializeFriends().subscribe({ error: () => {} });
     }
   });
 
@@ -132,6 +136,7 @@ const MainApp = () => {
           }
           rightChildren={
             <div className="flex items-center gap-1">
+              <OfflineIndicator />
               <Button
                 variant="ghost"
                 size="icon"

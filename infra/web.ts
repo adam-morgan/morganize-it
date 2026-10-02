@@ -6,6 +6,26 @@ export const web = new sst.aws.StaticSite("MorganizeItWeb", {
     command: "npm run vite:build",
     output: ".local/vite/dist",
   },
+  assets: {
+    // IMPORTANT: SST only serves files that match a fileOptions glob — anything
+    // matching none returns 403. So these rules MUST cover every file. The two
+    // globs are mutually exclusive (via `ignore`), so coverage is total and
+    // independent of match-ordering semantics.
+    fileOptions: [
+      {
+        // HTML, the service worker, and the manifest must always revalidate so
+        // new deploys are picked up (a cached sw.js would strand the PWA).
+        files: ["**/*.html", "sw.js", "manifest.json"],
+        cacheControl: "max-age=0,no-cache,no-store,must-revalidate",
+      },
+      {
+        // Everything else (hashed JS/CSS, images, icons, fonts, ...): immutable.
+        files: ["**"],
+        ignore: ["**/*.html", "sw.js", "manifest.json"],
+        cacheControl: "max-age=31536000,public,immutable",
+      },
+    ],
+  },
   dev: {
     command: "npm run vite:dev",
     url: "http://localhost:9000",

@@ -28,7 +28,7 @@ export const deleteNoteAttachment = (
 ): Observable<Note> =>
   apiDelete(`/notes/${noteId}/attachments/${attachmentId}`);
 
-export const uploadFileToUrl = async (uploadUrl: string, file: File): Promise<void> => {
+export const uploadFileToUrl = async (uploadUrl: string, file: Blob): Promise<void> => {
   const response = await fetch(uploadUrl, {
     method: "PUT",
     body: file,

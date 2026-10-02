@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Trash2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrashSlice } from "../trashSlice";
+import { useNetworkSlice } from "@/features/network/networkSlice";
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
 import { useState } from "react";
@@ -18,13 +19,18 @@ const TrashView = () => {
     permanentDeleteNotebook,
     emptyTrash,
   } = useTrashSlice();
+  const online = useNetworkSlice((s) => s.online);
   const reactiveQuery = useReactiveQueryWithMask();
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "note" | "notebook"; id: string; name: string } | null>(null);
 
   useEffect(() => {
-    reactiveQuery(() => loadTrash(), "Loading trash...", () => {});
-  }, []);
+    // Trash lives only on the server (no offline cache), so skip loading when
+    // offline — the network request would just error.
+    if (online) {
+      reactiveQuery(() => loadTrash(), "Loading trash...", () => {});
+    }
+  }, [online]);
 
   const handleRestore = (type: "note" | "notebook", id: string) => {
     const label = type === "note" ? "Restoring note..." : "Restoring notebook...";
@@ -57,6 +63,16 @@ const TrashView = () => {
   };
 
   const hasItems = deletedNotebooks.length > 0 || deletedNotes.length > 0;
+
+  if (!online) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <Trash2 className="mb-3 h-12 w-12 opacity-30" />
+        <p>Trash isn&apos;t available offline</p>
+        <p className="mt-1 text-xs">Reconnect to view and manage deleted items.</p>
+      </div>
+    );
+  }
 
   if (!loaded) return null;
 

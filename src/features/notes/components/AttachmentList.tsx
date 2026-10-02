@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { take } from "rxjs";
+import { firstValueFrom, take } from "rxjs";
 import {
   File,
   FileImage,
@@ -11,10 +11,15 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getAttachmentDownloadUrl, deleteNoteAttachment } from "../services/attachment-service";
+import { getCachedAttachment, putAttachmentBlob } from "../services/attachment-cache";
+import { useAuthSlice } from "@/features/auth";
+import { useNetworkSlice } from "@/features/network/networkSlice";
 import DeleteConfirmDialog from "../containers/DeleteConfirmDialog";
+import AttachmentViewerDialog from "./AttachmentViewerDialog";
 
 const LONG_PRESS_MS = 500;
 
@@ -38,12 +43,23 @@ const getFileIcon = (mimeType: string) => {
   return <File className="h-4 w-4 shrink-0" />;
 };
 
+type ViewerState = {
+  blob: Blob;
+  filename: string;
+  mimeType: string;
+};
+
 const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: Props) => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<ViewerState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
+
+  const user = useAuthSlice((s) => s.user);
+  const online = useNetworkSlice((s) => s.online);
+  const userId = user && !(user as GuestUser).isGuest ? (user.id as string) : null;
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current) {
@@ -65,17 +81,67 @@ const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: P
     clearLongPressTimer();
   };
 
+  // Everything renders in the in-app viewer. window.open and programmatic
+  // <a download> clicks are blocked or silently dropped inside installed PWAs
+  // on iOS (they also lose the user gesture across our async cache reads), so
+  // popups can never be the delivery mechanism for attachments.
+  const openFromCache = async (attachment: Attachment): Promise<boolean> => {
+    if (!userId) {
+      return false;
+    }
+
+    const cached = await getCachedAttachment(userId, noteId, attachment.id);
+    if (cached) {
+      setViewer({ blob: cached.blob, filename: attachment.filename, mimeType: attachment.mimeType });
+      return true;
+    }
+
+    return false;
+  };
+
+  const fetchAndOpen = async (attachment: Attachment): Promise<void> => {
+    const { downloadUrl } = await firstValueFrom(getAttachmentDownloadUrl(noteId, attachment.id));
+
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+
+    // Opportunistically cache the bytes we just paid for, so this attachment
+    // opens offline next time. Best-effort — viewing must not depend on it.
+    if (userId) {
+      void putAttachmentBlob(userId, noteId, attachment.id, blob, attachment.filename, attachment.mimeType).catch(() => {});
+    }
+
+    setViewer({ blob, filename: attachment.filename, mimeType: attachment.mimeType });
+  };
+
   const handleOpen = (attachment: Attachment) => {
     setLoadingId(attachment.id);
-    getAttachmentDownloadUrl(noteId, attachment.id)
-      .pipe(take(1))
-      .subscribe({
-        next: ({ downloadUrl }) => {
-          window.open(downloadUrl, "_blank");
-          setLoadingId(null);
-        },
-        error: () => setLoadingId(null),
-      });
+
+    const finish = () => setLoadingId(null);
+
+    // Cache first: instant, and it's the only source when offline. The online
+    // flag is just a hint (navigator.onLine lies inside iOS PWAs), so a cache
+    // miss always falls through to the network attempt, which in turn falls
+    // back to a clear message when it fails.
+    void openFromCache(attachment)
+      .then((served) => {
+        if (served) {
+          return;
+        }
+
+        return fetchAndOpen(attachment).catch(() => {
+          toast(
+            online
+              ? "Couldn't open attachment — and it isn't saved offline."
+              : "This attachment isn't saved for offline use yet."
+          );
+        });
+      })
+      .finally(finish);
   };
 
   const handleDelete = (attachment: Attachment) => {
@@ -166,6 +232,14 @@ const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: P
           </Popover>
         ))}
       </div>
+
+      <AttachmentViewerDialog
+        open={!!viewer}
+        blob={viewer?.blob ?? null}
+        filename={viewer?.filename ?? ""}
+        mimeType={viewer?.mimeType ?? ""}
+        onClose={() => setViewer(null)}
+      />
 
       <DeleteConfirmDialog
         open={!!deleteTarget}
