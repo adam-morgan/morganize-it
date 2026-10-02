@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { take } from "rxjs";
-import { Plus, LayoutGrid, List, Search, X, ArrowUpDown, Check, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
+import { Plus, LayoutGrid, List, ArrowUpDown, Check, MoreVertical, Pencil, Share2, Trash2, Archive, ArchiveRestore } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +29,8 @@ import {
   DropdownMenuTrigger as ToolbarDropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ShareDialog } from "@/features/shares";
+import SearchInput from "./stash/SearchInput";
+import ArchivedBanner from "./stash/ArchivedBanner";
 
 type ViewMode = "card" | "list";
 
@@ -59,9 +60,17 @@ const sortOptions: { value: NoteSortOption; label: string }[] = [
 const NotebookView = () => {
   const { notebookId } = useParams<{ notebookId: string }>();
   const navigate = useNavigate();
-  const { notes: allNotesMap, loadNotes, getSortedNotes, sortBy, setSortBy, deleteNote, updateNote } =
-    useNotesSlice();
-  const { notebooks, updateNotebook, deleteNotebook } = useNotebooksSlice();
+  const {
+    notes: allNotesMap,
+    loadNotes,
+    getSortedNotes,
+    sortBy,
+    setSortBy,
+    deleteNote,
+    updateNote,
+    setNoteArchived,
+  } = useNotesSlice();
+  const { notebooks, updateNotebook, setNotebookArchived, deleteNotebook } = useNotebooksSlice();
   const { mask } = useMaskSlice();
   const myUserId = useAuthSlice((s) => s.user?.id);
   const reactiveQuery = useReactiveQueryWithMask();
@@ -78,12 +87,14 @@ const NotebookView = () => {
   const [renameNote, setRenameNote] = useState<Note | null>(null);
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Note | null>(null);
   const [tagsNote, setTagsNote] = useState<Note | null>(null);
   const [shareNote, setShareNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [renameNotebookOpen, setRenameNotebookOpen] = useState(false);
   const [shareNotebookOpen, setShareNotebookOpen] = useState(false);
   const [deleteNotebookOpen, setDeleteNotebookOpen] = useState(false);
+  const [archiveNotebookOpen, setArchiveNotebookOpen] = useState(false);
 
   const effectiveViewMode = isMobile ? "list" : viewMode;
 
@@ -105,7 +116,8 @@ const NotebookView = () => {
     return null;
   }
 
-  const allNotes = getSortedNotes(notebookId);
+  const isNotebookArchived = !!notebook.archivedAt;
+  const allNotes = getSortedNotes(notebookId).filter((n) => !n.archivedAt);
   const notes = searchQuery ? searchNotes(allNotes, searchQuery) : allNotes;
   const allTags = [...new Set(Object.values(allNotesMap).flat().flatMap((n) => n.tags ?? []))];
 
@@ -128,30 +140,54 @@ const NotebookView = () => {
     });
   };
 
+  const handleArchiveNote = () => {
+    if (!archiveTarget) return;
+    const unmask = mask("Archiving note...");
+    setNoteArchived(archiveTarget.id, archiveTarget.notebookId, true).pipe(take(1)).subscribe({
+      complete: () => {
+        unmask();
+        setArchiveTarget(null);
+      },
+      error: () => {
+        unmask();
+        setArchiveTarget(null);
+      },
+    });
+  };
+
+  const handleSetNotebookArchived = (archived: boolean) => {
+    const unmask = mask(archived ? "Archiving notebook..." : "Unarchiving notebook...");
+    setNotebookArchived(notebook.id, archived).pipe(take(1)).subscribe({
+      complete: () => {
+        unmask();
+        setArchiveNotebookOpen(false);
+      },
+      error: () => {
+        unmask();
+        setArchiveNotebookOpen(false);
+      },
+    });
+  };
+
   const handleNoteClick = (note: Note) => {
     navigate(`/notebooks/${notebookId}/notes/${note.id}`);
   };
 
   return (
     <div className="p-6">
+      {isNotebookArchived && (
+        <ArchivedBanner
+          message="This notebook is archived."
+          onUnarchive={canDeleteNotebook ? () => handleSetNotebookArchived(false) : undefined}
+        />
+      )}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-48 pl-9 pr-8"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search notes..."
+          className="w-48"
+        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="cursor-pointer" title="Sort notes">
@@ -221,6 +257,20 @@ const NotebookView = () => {
                   )}
                   {canDeleteNotebook && (
                     <ToolbarDropdownMenuItem
+                      onClick={() =>
+                        isNotebookArchived ? handleSetNotebookArchived(false) : setArchiveNotebookOpen(true)
+                      }
+                    >
+                      {isNotebookArchived ? (
+                        <ArchiveRestore className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Archive className="mr-2 h-4 w-4" />
+                      )}
+                      {isNotebookArchived ? "Unarchive" : "Archive"}
+                    </ToolbarDropdownMenuItem>
+                  )}
+                  {canDeleteNotebook && (
+                    <ToolbarDropdownMenuItem
                       onClick={() => setDeleteNotebookOpen(true)}
                       className="text-destructive"
                     >
@@ -257,6 +307,7 @@ const NotebookView = () => {
                   onTags={noteEditable ? () => setTagsNote(note) : undefined}
                   onShare={owned ? () => setShareNote(note) : undefined}
                   onTagClick={handleTagClick}
+                  onArchive={owned ? () => setArchiveTarget(note) : undefined}
                   onDelete={owned ? () => setDeleteTarget(note) : undefined}
                 />
               );
@@ -278,6 +329,7 @@ const NotebookView = () => {
                   onTags={noteEditable ? () => setTagsNote(note) : undefined}
                   onShare={owned ? () => setShareNote(note) : undefined}
                   onTagClick={handleTagClick}
+                  onArchive={owned ? () => setArchiveTarget(note) : undefined}
                   onDelete={owned ? () => setDeleteTarget(note) : undefined}
                 />
               );
@@ -338,6 +390,14 @@ const NotebookView = () => {
         message={`Are you sure you want to delete "${deleteTarget?.title}"? You can restore it from Trash.`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <DeleteConfirmDialog
+        open={archiveTarget !== null}
+        title="Archive Note"
+        message={`Are you sure you want to archive "${archiveTarget?.title}"? You can find it under Archived.`}
+        onConfirm={handleArchiveNote}
+        onCancel={() => setArchiveTarget(null)}
       />
 
       <TagsDialog
@@ -406,6 +466,14 @@ const NotebookView = () => {
           onClose={() => setShareNote(null)}
         />
       )}
+
+      <DeleteConfirmDialog
+        open={archiveNotebookOpen}
+        title="Archive Notebook"
+        message={`Are you sure you want to archive "${notebook.name}"? You can find it under Archived.`}
+        onConfirm={() => handleSetNotebookArchived(true)}
+        onCancel={() => setArchiveNotebookOpen(false)}
+      />
 
       <DeleteConfirmDialog
         open={deleteNotebookOpen}

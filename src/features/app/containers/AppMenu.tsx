@@ -1,5 +1,5 @@
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
-import { Plus, ChevronRight, ChevronDown, MoreVertical, Pencil, Trash2, FileText, Share2, Users, LogOut } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, MoreVertical, Pencil, Trash2, FileText, Share2, Users, LogOut, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,7 +18,7 @@ import { ShareDialog, useSharesSlice } from "@/features/shares";
 import { useNavigate, useMatch } from "react-router-dom";
 
 const AppMenu = () => {
-  const { notebooks, updateNotebook, deleteNotebook } = useNotebooksSlice();
+  const { notebooks, updateNotebook, setNotebookArchived, deleteNotebook } = useNotebooksSlice();
   const { expandedNotebookId, expandNotebook, loadNotes, notes } =
     useNotesSlice();
   const reactiveQuery = useReactiveQueryWithMask();
@@ -33,16 +33,19 @@ const AppMenu = () => {
 
   const [renameTarget, setRenameTarget] = useState<Notebook | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Notebook | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Notebook | null>(null);
   const [shareTarget, setShareTarget] = useState<Notebook | null>(null);
 
   const { errorAlert, successAlert } = useAlertSlice();
 
   // Derive owned, shared, and shadow notebooks from unified state
-  const ownedNotebooks = notebooks.filter((nb) => nb.accessLevel === "owner");
-  const sharedNotebooks = notebooks.filter(
+  const currentNotebooks = notebooks.filter((nb) => !nb.archivedAt);
+  const ownedNotebooks = currentNotebooks.filter((nb) => nb.accessLevel === "owner");
+  const sharedNotebooks = currentNotebooks.filter(
     (nb) => nb.accessLevel === "read" || nb.accessLevel === "readwrite"
   );
-  const shadowNotebooks = notebooks.filter((nb) => nb.accessLevel === "none");
+  const shadowNotebooks = currentNotebooks.filter((nb) => nb.accessLevel === "none");
+  const currentNotesOf = (notebookId: string) => (notes[notebookId] ?? []).filter((n) => !n.archivedAt);
 
   const handleLeaveShare = (shareId: string, notebookId: string) => {
     const unmask = mask("Leaving share...");
@@ -108,6 +111,23 @@ const AppMenu = () => {
       });
   };
 
+  const handleArchive = () => {
+    if (!archiveTarget) return;
+    const unmask = mask("Archiving...");
+    setNotebookArchived(archiveTarget.id, true)
+      .pipe(take(1))
+      .subscribe({
+        complete: () => {
+          unmask();
+          setArchiveTarget(null);
+        },
+        error: () => {
+          unmask();
+          setArchiveTarget(null);
+        },
+      });
+  };
+
   const handleNoteClick = (noteId: string, notebookId: string) => {
     navigate(`/notebooks/${notebookId}/notes/${noteId}`);
   };
@@ -140,7 +160,7 @@ const AppMenu = () => {
         {(ownedNotebooks ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)).map((notebook) => {
           const isExpanded = expandedNotebookId === notebook.id;
           const isSelected = currentNotebookId === notebook.id;
-          const notebookNotes = notes[notebook.id] ?? [];
+          const notebookNotes = currentNotesOf(notebook.id);
 
           return (
             <li key={notebook.id}>
@@ -176,6 +196,10 @@ const AppMenu = () => {
                     <DropdownMenuItem onClick={() => setShareTarget(notebook)}>
                       <Share2 className="mr-2 h-4 w-4" />
                       Share
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setArchiveTarget(notebook)}>
+                      <Archive className="mr-2 h-4 w-4" />
+                      Archive
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setDeleteTarget(notebook)}
@@ -237,7 +261,7 @@ const AppMenu = () => {
               .map((notebook) => {
                 const isExpanded = expandedNotebookId === notebook.id;
                 const isSelected = currentNotebookId === notebook.id;
-                const allNotes = notes[notebook.id] ?? [];
+                const allNotes = currentNotesOf(notebook.id);
                 return (
                   <li key={`shared-nb-${notebook.id}`}>
                     <div
@@ -316,7 +340,7 @@ const AppMenu = () => {
               .map((shadow) => {
                 const isExpanded = expandedNotebookId === shadow.id;
                 const isSelected = currentNotebookId === shadow.id;
-                const shadowNotes = notes[shadow.id] ?? [];
+                const shadowNotes = currentNotesOf(shadow.id);
                 return (
                   <li key={`shadow-nb-${shadow.id}`}>
                     <div
@@ -371,6 +395,21 @@ const AppMenu = () => {
         <li>
           <button
             className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent text-muted-foreground"
+            onClick={() => navigate("/archive")}
+          >
+            <Archive className="h-4 w-4" />
+            Archived
+          </button>
+        </li>
+      </ul>
+
+      <div className="px-4 py-2">
+        <Separator />
+      </div>
+      <ul>
+        <li>
+          <button
+            className="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent text-muted-foreground"
             onClick={() => navigate("/trash")}
           >
             <Trash2 className="h-4 w-4" />
@@ -388,6 +427,14 @@ const AppMenu = () => {
           onCancel={() => setRenameTarget(null)}
         />
       )}
+
+      <DeleteConfirmDialog
+        open={archiveTarget !== null}
+        title="Archive Notebook"
+        message={`Are you sure you want to archive "${archiveTarget?.name}"? You can find it under Archived.`}
+        onConfirm={handleArchive}
+        onCancel={() => setArchiveTarget(null)}
+      />
 
       <DeleteConfirmDialog
         open={deleteTarget !== null}

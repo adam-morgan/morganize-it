@@ -477,6 +477,129 @@ describe("Express - Shares & Shared Resources", () => {
     });
   });
 
+  describe("Archive", () => {
+    const shareNotebook = (permission: SharePermission) =>
+      request(app)
+        .post("/api/shares")
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ resourceType: "notebook", resourceId: notebookId, sharedWithUserId: bobId, permission });
+
+    const archivedAt = new Date().toISOString();
+
+    it("owner can archive and unarchive a notebook", async () => {
+      const archived = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      expect(archived.status).toBe(200);
+      expect(archived.body.archivedAt).toBe(archivedAt);
+
+      const unarchived = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt: null });
+
+      expect(unarchived.status).toBe(200);
+      expect(unarchived.body.archivedAt ?? null).toBeNull();
+    });
+
+    it("owner can archive and unarchive a note", async () => {
+      const archived = await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      expect(archived.status).toBe(200);
+      expect(archived.body.archivedAt).toBe(archivedAt);
+
+      const unarchived = await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt: null });
+
+      expect(unarchived.status).toBe(200);
+      expect(unarchived.body.archivedAt ?? null).toBeNull();
+    });
+
+    it("readwrite recipient cannot archive the owner's notebook or note", async () => {
+      await shareNotebook("readwrite");
+
+      const notebookRes = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ archivedAt });
+
+      expect(notebookRes.status).toBe(403);
+
+      const noteRes = await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ archivedAt });
+
+      expect(noteRes.status).toBe(403);
+    });
+
+    it("readwrite recipient can still edit a note in an archived notebook", async () => {
+      await shareNotebook("readwrite");
+
+      await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      const res = await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ title: "Edited while archived" });
+
+      expect(res.status).toBe(200);
+    });
+
+    it("deleting an archived notebook clears archivedAt so restore returns it to current", async () => {
+      await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      const deleted = await request(app)
+        .delete(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`);
+
+      expect(deleted.status).toBe(204);
+
+      const restored = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ deletedAt: null });
+
+      expect(restored.status).toBe(200);
+      expect(restored.body.archivedAt ?? null).toBeNull();
+
+      const note = await getKnex()("notes").where({ id: noteId }).first();
+
+      expect(note.archivedAt).toBeNull();
+    });
+
+    it("sync returns archivedAt", async () => {
+      await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ archivedAt });
+
+      const res = await request(app).post("/api/sync").set("Authorization", `Bearer ${aliceToken}`).send({});
+
+      const synced = (res.body as SyncResponse).notebooks.find((nb) => nb.id === notebookId);
+
+      expect(synced?.archivedAt).toBe(archivedAt);
+    });
+  });
+
   describe("POST /api/sync", () => {
     const createBobNote = async () => {
       const now = new Date().toISOString();

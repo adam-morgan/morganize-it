@@ -14,12 +14,9 @@ export default defineConfig({
     tailwindcss(),
     eslint(),
     VitePWA({
-      // Auto-update the service worker in the background; combined with the
-      // precache below this is what lets the app shell open with no network.
       registerType: "autoUpdate",
-      // Inline the registration into index.html (which is served no-cache) so
-      // there's no extra registerSW.js file to manage cache headers for.
-      injectRegister: "inline",
+      // Registered by src/pwa/register-sw.ts, which also polls for updates.
+      injectRegister: false,
       // Reuse the existing public/manifest.json (already linked in index.html).
       manifest: false,
       workbox: {
@@ -29,6 +26,10 @@ export default defineConfig({
         // whole shell is actually precached (otherwise offline silently breaks).
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        // Activate a new deploy as soon as it installs instead of waiting for
+        // every tab to close, otherwise a normal refresh keeps the old build.
+        skipWaiting: true,
+        clientsClaim: true,
         // Inline the Workbox runtime into sw.js so there's a single,
         // self-contained service worker file to manage cache headers for.
         inlineWorkboxRuntime: true,

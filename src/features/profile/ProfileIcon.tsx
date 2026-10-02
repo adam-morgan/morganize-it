@@ -18,6 +18,8 @@ import { useNotebooksSlice } from "../notes/notebooksSlice";
 import { exportData, importData } from "../notes/services/export-service";
 import { useFriendsSlice } from "../friends";
 import { take } from "rxjs";
+import { useNetworkSlice } from "../network/networkSlice";
+import DeleteConfirmDialog from "../notes/containers/DeleteConfirmDialog";
 
 type ProfileIconProps = {
   withMenu?: boolean;
@@ -30,6 +32,8 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
   const { mask } = useMaskSlice();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const unsyncedCount = useNetworkSlice((s) => s.pendingCount + s.failedCount);
 
   const incomingCount = useFriendsSlice((s) => s.incomingRequests.length);
   const showBadge = withMenu && incomingCount > 0;
@@ -111,6 +115,12 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
   };
 
   const handleLogout = () => {
+    if (unsyncedCount > 0 && !confirmLogout) {
+      setConfirmLogout(true);
+      return;
+    }
+
+    setConfirmLogout(false);
     logout().subscribe({
       complete: () => navigate("/login"),
       error: () => navigate("/login"),
@@ -185,6 +195,13 @@ const ProfileIcon = ({ withMenu = true }: ProfileIconProps) => {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      <DeleteConfirmDialog
+        open={confirmLogout}
+        title="Log Out?"
+        message={`You have ${unsyncedCount} change${unsyncedCount === 1 ? "" : "s"} that haven't synced to the server yet. Logging out will discard ${unsyncedCount === 1 ? "it" : "them"}.`}
+        onConfirm={handleLogout}
+        onCancel={() => setConfirmLogout(false)}
+      />
       <input
         ref={fileInputRef}
         type="file"

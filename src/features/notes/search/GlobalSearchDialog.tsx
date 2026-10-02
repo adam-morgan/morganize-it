@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { openDB } from "idb";
 import { Search } from "lucide-react";
 import {
   Dialog,
@@ -10,7 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuthSlice } from "@/features/auth";
 import { useNotebooksSlice } from "../notebooksSlice";
-import { getCacheDb } from "../services/cache-db";
+import { getAllLocalNotes } from "../services/local-entities";
+import { archivedNotebookIdsOf, isNoteArchived } from "../archive-utils";
 import { searchNotes } from "./search-utils";
 import SearchResultItem from "./SearchResultItem";
 
@@ -64,8 +64,11 @@ const GlobalSearchDialog = ({
     const timer = setTimeout(async () => {
       try {
         if (!user) return;
-        const allNotes = await getAllNotes(user);
-        const activeNotes = allNotes.filter((n) => !n.deletedAt);
+        const allNotes = await getAllLocalNotes(user);
+        const archivedNotebookIds = archivedNotebookIdsOf(useNotebooksSlice.getState().notebooks);
+        const activeNotes = allNotes.filter(
+          (n) => !n.deletedAt && !isNoteArchived(n, archivedNotebookIds)
+        );
         const matched = searchNotes(activeNotes, query).slice(0, MAX_RESULTS);
         const nbMap = notebookMap();
         setResults(
@@ -154,14 +157,5 @@ const GlobalSearchDialog = ({
     </Dialog>
   );
 };
-
-async function getAllNotes(user: User): Promise<Note[]> {
-  if ((user as GuestUser).isGuest) {
-    const db = await openDB("morganizeit", 2);
-    return db.getAll("notes");
-  }
-  const db = await getCacheDb(user.id);
-  return db.getAll("notes");
-}
 
 export default GlobalSearchDialog;

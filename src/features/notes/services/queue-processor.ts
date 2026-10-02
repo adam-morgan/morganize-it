@@ -10,6 +10,7 @@ import {
   putMutation,
   removeMutation,
   resetInflight,
+  retryFailed,
   counts,
 } from "./mutation-queue";
 
@@ -39,6 +40,7 @@ const messageOf = (err: unknown): string =>
  */
 export class QueueProcessor {
   private flushing = false;
+  private currentFlush: Promise<void> | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private recoveredInflight = false;
 
@@ -51,20 +53,31 @@ export class QueueProcessor {
     return this.flush();
   }
 
-  async flush(): Promise<void> {
+  // `force` ignores backoff — used when connectivity has just been confirmed.
+  async flush(options?: { force?: boolean }): Promise<void> {
     if (this.flushing) {
-      return;
+      return this.currentFlush ?? Promise.resolve();
     }
 
     this.flushing = true;
+    this.currentFlush = this.runFlush(options?.force ?? false);
 
+    return this.currentFlush;
+  }
+
+  async retryFailed(): Promise<void> {
+    await retryFailed(this.userId);
+    await this.flush({ force: true });
+  }
+
+  private async runFlush(force: boolean): Promise<void> {
     try {
       if (!this.recoveredInflight) {
         await resetInflight(this.userId);
         this.recoveredInflight = true;
       }
 
-      await this.drain();
+      await this.drain(force);
     } catch (err) {
       // Never reject: flush runs before every sync pull, so a transient IDB
       // error here must not break syncing. Per-mutation errors are already
@@ -72,6 +85,7 @@ export class QueueProcessor {
       console.warn("Queue flush failed:", err);
     } finally {
       this.flushing = false;
+      this.currentFlush = null;
       await this.refreshCounts().catch(() => {});
     }
   }
@@ -83,9 +97,9 @@ export class QueueProcessor {
     slice.setFailedCount(failed);
   }
 
-  private async drain(): Promise<void> {
+  private async drain(force: boolean): Promise<void> {
     for (;;) {
-      const batch = await listForFlush(this.userId, Date.now());
+      const batch = await listForFlush(this.userId, force ? Infinity : Date.now());
       if (batch.length === 0) {
         break;
       }
@@ -212,14 +226,14 @@ export class QueueProcessor {
       status === undefined || status >= 500 || status === 401 || status === 429;
 
     if (transient) {
-      if (status === undefined) {
-        // No HTTP status => the request never reached the server.
-        useNetworkSlice.getState().setOnline(false);
-      }
+      // No HTTP status => the request never reached the server. Being offline
+      // is not the mutation's fault, so it backs off without using up retries.
+      const networkFailure = status === undefined;
+      const retryCount = networkFailure
+        ? Math.min(mutation.retryCount + 1, MAX_RETRIES - 1)
+        : mutation.retryCount + 1;
 
-      const retryCount = mutation.retryCount + 1;
-
-      if (retryCount >= MAX_RETRIES) {
+      if (!networkFailure && retryCount >= MAX_RETRIES) {
         await putMutation(this.userId, {
           ...mutation,
           status: "failed",

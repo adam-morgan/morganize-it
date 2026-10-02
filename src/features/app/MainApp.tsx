@@ -15,12 +15,14 @@ import { useMainAppSlice } from "./mainAppSlice";
 import { NotebookView, NoteRoute, useNotebooksSlice } from "../notes";
 import TagView from "../notes/containers/TagView";
 import TrashView from "../notes/containers/TrashView";
+import ArchiveView from "../notes/containers/ArchiveView";
 import RecentNotes from "../notes/containers/RecentNotes";
 import GlobalSearchDialog from "../notes/search/GlobalSearchDialog";
 import { FriendsView, useFriendsSlice } from "../friends";
 import { useAuthSlice } from "../auth";
 import { useNetworkStatus } from "../network/useNetworkStatus";
 import OfflineIndicator from "../network/OfflineIndicator";
+import UpdateBanner from "@/pwa/UpdateBanner";
 import { Routes, Route, Link, useMatch } from "react-router-dom";
 
 const WelcomeView = () => (
@@ -57,6 +59,7 @@ const MainApp = () => {
   const tagMatch = useMatch("/tags/:tagName");
   const tagName = tagMatch?.params.tagName ? decodeURIComponent(tagMatch.params.tagName) : null;
   const trashMatch = useMatch("/trash");
+  const archiveMatch = useMatch("/archive");
   const friendsMatch = useMatch("/friends");
 
   const initializeFriends = useFriendsSlice((s) => s.initialize);
@@ -107,7 +110,9 @@ const MainApp = () => {
     ? "Friends"
     : trashMatch
       ? "Trash"
-      : tagName
+      : archiveMatch
+        ? "Archived"
+        : tagName
         ? `Tag: ${tagName}`
         : selectedNotebook
           ? selectedNotebook.name
@@ -154,11 +159,13 @@ const MainApp = () => {
           <Route path="/notebooks/:notebookId" element={<NotebookView />} />
           <Route path="/tags/:tagName" element={<TagView />} />
           <Route path="/trash" element={<TrashView />} />
+          <Route path="/archive" element={<ArchiveView />} />
           <Route path="/friends" element={<FriendsView />} />
           <Route path="*" element={<WelcomeView />} />
         </Routes>
       </div>
       <GlobalSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <UpdateBanner />
       <Drawer
         variant={mobileMode ? "temporary" : "persistent"}
         open={drawerOpen}

@@ -3,6 +3,7 @@ import { PermissionResolver } from "@/server/permissions";
 import { getShareAccessService } from "@/server/features/shares";
 import { ConflictError, NotFoundError } from "@/server/errors";
 import { getNotebookService } from "../services";
+import { changesArchivedAt } from "./archive";
 
 export class NotebookPermissionResolver implements PermissionResolver<Notebook> {
   canCreate(userId: string, entity: Notebook): Observable<boolean> {
@@ -34,12 +35,12 @@ export class NotebookPermissionResolver implements PermissionResolver<Notebook> 
 
           if (entity.userId && entity.userId !== existing.userId) return of(false);
 
+          const ownerOnly = !!existing.deletedAt || changesArchivedAt(entity, existing);
+
           return getShareAccessService()
             .getNotebookAccess(userId, entity.id)
             .pipe(
-              map((level) =>
-                existing.deletedAt ? level === "owner" : level === "owner" || level === "readwrite"
-              )
+              map((level) => (ownerOnly ? level === "owner" : level === "owner" || level === "readwrite"))
             );
         })
       );

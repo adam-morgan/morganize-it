@@ -1,7 +1,15 @@
-import { from, map, Observable, switchMap, throwError } from "rxjs";
+import { catchError, from, map, Observable, switchMap, tap, throwError, timeout } from "rxjs";
 import { fromFetch } from "rxjs/fetch";
+import { useNetworkSlice } from "@/features/network/networkSlice";
 
-export const apiGet = <Resp>(path: string): Observable<Resp> => apiRequest("GET", path);
+const DEFAULT_TIMEOUT_MS = 20_000;
+
+type RequestOptions = {
+  timeoutMs?: number;
+};
+
+export const apiGet = <Resp>(path: string, options?: RequestOptions): Observable<Resp> =>
+  apiRequest("GET", path, undefined, options);
 
 export const apiPost = <Req, Resp>(path: string, body: Req): Observable<Resp> =>
   apiRequest("POST", path, body);
@@ -47,31 +55,51 @@ const getApiUrl = (): string => {
   return url;
 };
 
-let refreshInProgress: Promise<boolean> | null = null;
+const setOnline = (online: boolean) => {
+  if (useNetworkSlice.getState().online !== online) {
+    useNetworkSlice.getState().setOnline(online);
+  }
+};
 
-const attemptRefresh = async (): Promise<boolean> => {
+// Thrown when a request never got an HTTP response (offline, DNS, timeout).
+// It deliberately has no `status`, which callers treat as "network failure".
+const networkError = (message: string): Error => new Error(message);
+
+type RefreshResult = "refreshed" | "rejected" | "network-error";
+
+let refreshInProgress: Promise<RefreshResult> | null = null;
+
+const attemptRefresh = async (): Promise<RefreshResult> => {
   if (refreshInProgress) return refreshInProgress;
 
-  refreshInProgress = (async () => {
+  refreshInProgress = (async (): Promise<RefreshResult> => {
     const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
+    if (!refreshToken) return "rejected";
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
     try {
       const response = await fetch(`${getApiUrl()}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
       });
 
-      if (!response.ok) return false;
+      setOnline(true);
+
+      if (!response.ok) return "rejected";
 
       const data = await response.json() as RefreshResponse;
       setAuthToken(data.token);
       setRefreshToken(data.refreshToken);
-      return true;
+      return "refreshed";
     } catch {
-      return false;
+      setOnline(false);
+      return "network-error";
     } finally {
+      clearTimeout(timer);
       refreshInProgress = null;
     }
   })();
@@ -79,7 +107,13 @@ const attemptRefresh = async (): Promise<boolean> => {
   return refreshInProgress;
 };
 
-const apiRequest = <Req, Resp>(method: string, path: string, body?: Req): Observable<Resp> => {
+const apiRequest = <Req, Resp>(
+  method: string,
+  path: string,
+  body?: Req,
+  options?: RequestOptions
+): Observable<Resp> => {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const url = getApiUrl();
 
   let _path = path;
@@ -102,15 +136,27 @@ const apiRequest = <Req, Resp>(method: string, path: string, body?: Req): Observ
       method,
       headers,
       body: body != null ? JSON.stringify(body) : undefined,
-    });
+    }).pipe(
+      timeout({ first: timeoutMs, with: () => throwError(() => networkError("Request timed out")) }),
+      tap(() => setOnline(true)),
+      catchError((err: unknown) => {
+        setOnline(false);
+
+        return throwError(() => (err instanceof Error ? err : networkError(String(err))));
+      })
+    );
   };
 
   return doFetch(getAuthToken()).pipe(
     switchMap((response) => {
       if (response.status === 401 && getRefreshToken()) {
         return from(attemptRefresh()).pipe(
-          switchMap((refreshed) => {
-            if (refreshed) {
+          switchMap((result) => {
+            if (result === "network-error") {
+              return throwError(() => networkError("Could not reach the server to refresh the session"));
+            }
+
+            if (result === "refreshed") {
               return doFetch(getAuthToken()).pipe(
                 switchMap((retryResponse) => handleResponse<Resp>(retryResponse))
               );

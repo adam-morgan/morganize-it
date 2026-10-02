@@ -4,6 +4,7 @@ import { useNotebooksSlice } from "../notes/notebooksSlice";
 import { useNotesSlice } from "../notes/notesSlice";
 import { useRecentNotesSlice } from "../notes/recentNotesSlice";
 import { useTrashSlice } from "../notes/trashSlice";
+import { useArchiveSlice } from "../notes/archiveSlice";
 import { clearCache } from "../notes/services/cache-db";
 import { migrateLocalDataToServer } from "../notes/services/migration";
 import { useFriendsSlice } from "../friends/friendsSlice";
@@ -78,6 +79,7 @@ export const useAuthSlice = create<AuthSlice>((set, get) => ({
           useNotesSlice.getState().reset();
           useRecentNotesSlice.getState().reset();
           useTrashSlice.getState().reset();
+          useArchiveSlice.getState().reset();
           useFriendsSlice.getState().reset();
           useSharesSlice.getState().reset();
           if (userId) {

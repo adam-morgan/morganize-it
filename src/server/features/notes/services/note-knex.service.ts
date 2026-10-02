@@ -6,7 +6,7 @@ import { NotFoundError } from "@/server/errors";
 
 export class NoteKnexService extends UserEntityReactiveKnexService<Note> {
   constructor() {
-    super("notes", ["id", "title", "content", "textContent", "tags", "attachments", "notebookId", "userId", "createdAt", "updatedAt", "lastOpenedAt", "deletedAt"], "id");
+    super("notes", ["id", "title", "content", "textContent", "tags", "attachments", "notebookId", "userId", "createdAt", "updatedAt", "lastOpenedAt", "deletedAt", "archivedAt"], "id");
   }
 
   override find(options?: FindOptions, userId?: string): Observable<PageResult<Note>> {
@@ -41,7 +41,7 @@ export class NoteKnexService extends UserEntityReactiveKnexService<Note> {
     const now = new Date().toISOString();
     return from(
       getKnex()
-        .update({ deletedAt: now, updatedAt: now })
+        .update({ deletedAt: now, archivedAt: null, updatedAt: now })
         .from("notes")
         .where({ id })
         .whereNull("deletedAt")

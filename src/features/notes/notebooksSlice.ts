@@ -14,6 +14,7 @@ type NotebooksSlice = {
   fullResync: () => Observable<void>;
   createNotebook: (name: string) => Observable<Notebook>;
   updateNotebook: (id: string, name: string) => Observable<Notebook>;
+  setNotebookArchived: (id: string, archived: boolean) => Observable<Notebook>;
   deleteNotebook: (id: string) => Observable<void>;
   reset: () => void;
 };
@@ -70,7 +71,11 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
 
     return syncManager.sync().pipe(
       take(1),
-      tap((result) => applySyncResult(result)),
+      tap((result) => {
+        applySyncResult(result);
+
+        if (!get().initialized) set({ initialized: true });
+      }),
       map(() => undefined)
     );
   },
@@ -182,6 +187,21 @@ export const useNotebooksSlice = create<NotebooksSlice>((set, get) => ({
           ),
         }))
       )
+    );
+  },
+  setNotebookArchived: (id, archived) => {
+    const user = useAuthSlice.getState().user;
+    const notesSvc = getNotesService(user as User);
+    const archivedAt = archived ? new Date().toISOString() : null;
+
+    return notesSvc.setNotebookArchived(id, archivedAt).pipe(
+      tap((updated) => {
+        set((state) => ({
+          notebooks: state.notebooks.map((nb) => (nb.id === id ? { ...nb, ...updated, archivedAt } : nb)),
+        }));
+
+        useRecentNotesSlice.getState().reset();
+      })
     );
   },
   deleteNotebook: (id) => {

@@ -39,7 +39,7 @@ export class NoteDynamoService extends UserEntityReactiveDynamoService<Note> {
   override delete(id: TableID): Observable<void> {
     const now = new Date().toISOString();
     return this.findById(id).pipe(
-      switchMap((note) => super.update(id, { ...note, deletedAt: now, updatedAt: now })),
+      switchMap((note) => super.update(id, { ...note, deletedAt: now, archivedAt: null, updatedAt: now })),
       switchMap(() => of(undefined))
     );
   }

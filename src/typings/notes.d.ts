@@ -8,6 +8,7 @@ interface Notebook extends UserEntity {
   name: string;
   updatedAt: string;
   deletedAt?: string | null;
+  archivedAt?: string | null;
 }
 
 interface Note extends UserEntity {
@@ -21,6 +22,7 @@ interface Note extends UserEntity {
   tags?: string[];
   attachments?: Attachment[];
   deletedAt?: string | null;
+  archivedAt?: string | null;
 }
 
 interface SyncNotebook extends Notebook {

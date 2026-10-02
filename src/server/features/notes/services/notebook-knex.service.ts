@@ -6,7 +6,7 @@ import { NotFoundError } from "@/server/errors";
 
 export class NotebookKnexService extends UserEntityReactiveKnexService<Notebook> {
   constructor() {
-    super("notebooks", ["id", "name", "userId", "updatedAt", "deletedAt"], "id");
+    super("notebooks", ["id", "name", "userId", "updatedAt", "deletedAt", "archivedAt"], "id");
   }
 
   override create(data: Notebook): Observable<Notebook> {
@@ -45,7 +45,7 @@ export class NotebookKnexService extends UserEntityReactiveKnexService<Notebook>
         const count = await trx("notebooks")
           .where({ id })
           .whereNull("deletedAt")
-          .update({ deletedAt: now, updatedAt: now });
+          .update({ deletedAt: now, archivedAt: null, updatedAt: now });
 
         if (count === 0) {
           throw new NotFoundError("Record not found");
@@ -54,7 +54,7 @@ export class NotebookKnexService extends UserEntityReactiveKnexService<Notebook>
         await trx("notes")
           .where({ notebookId: id })
           .whereNull("deletedAt")
-          .update({ deletedAt: now, updatedAt: now });
+          .update({ deletedAt: now, archivedAt: null, updatedAt: now });
       })
     ).pipe(switchMap(() => of(undefined)));
   }

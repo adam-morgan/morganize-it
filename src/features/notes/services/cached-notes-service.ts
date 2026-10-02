@@ -28,6 +28,12 @@ export class CachedNotesService implements NotesService {
     );
   }
 
+  setNotebookArchived(id: string, archivedAt: string | null): Observable<Notebook> {
+    return this.api.setNotebookArchived(id, archivedAt).pipe(
+      tap((nb) => this.mergeIntoCache("notebooks", nb))
+    );
+  }
+
   deleteNotebook(id: string): Observable<void> {
     return this.api.deleteNotebook(id).pipe(
       tap(() => {

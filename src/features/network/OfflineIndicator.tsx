@@ -1,3 +1,6 @@
+import { RotateCcw } from "lucide-react";
+import { useAuthSlice } from "@/features/auth";
+import { getQueueProcessor } from "@/features/notes/services";
 import { useNetworkSlice } from "./networkSlice";
 
 /**
@@ -11,13 +14,23 @@ const OfflineIndicator = () => {
   const failedCount = useNetworkSlice((s) => s.failedCount);
 
   if (failedCount > 0) {
+    const handleRetry = () => {
+      const user = useAuthSlice.getState().user;
+
+      if (!user || (user as GuestUser).isGuest) return;
+
+      void getQueueProcessor(user as User)?.retryFailed();
+    };
+
     return (
-      <span
-        className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
-        title={`${failedCount} change${failedCount === 1 ? "" : "s"} failed to sync`}
+      <button
+        className="flex cursor-pointer items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive hover:bg-destructive/20"
+        title={`${failedCount} change${failedCount === 1 ? "" : "s"} failed to sync. Click to retry.`}
+        onClick={handleRetry}
       >
+        <RotateCcw className="h-3 w-3" />
         {failedCount} unsynced
-      </span>
+      </button>
     );
   }
 

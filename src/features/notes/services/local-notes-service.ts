@@ -49,6 +49,19 @@ export class LocalNotesService implements NotesService {
     );
   }
 
+  public setNotebookArchived(id: string, archivedAt: string | null): Observable<Notebook> {
+    return from(this.getDb()).pipe(
+      switchMap((db) =>
+        from(db.get("notebooks", id) as Promise<Notebook>).pipe(
+          switchMap((notebook) => {
+            const updated = { ...notebook, archivedAt };
+            return from(db.put("notebooks", updated)).pipe(map(() => updated));
+          })
+        )
+      )
+    );
+  }
+
   public deleteNotebook(id: string): Observable<void> {
     return from(this.getDb()).pipe(
       switchMap((db) =>

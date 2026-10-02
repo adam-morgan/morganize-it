@@ -128,6 +128,7 @@ const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: P
     // miss always falls through to the network attempt, which in turn falls
     // back to a clear message when it fails.
     void openFromCache(attachment)
+      .catch(() => false)
       .then((served) => {
         if (served) {
           return;
@@ -154,7 +155,10 @@ const AttachmentList = ({ noteId, attachments, canEdit, onAttachmentsChange }: P
           onAttachmentsChange(updatedNote.attachments ?? []);
           setLoadingId(null);
         },
-        error: () => setLoadingId(null),
+        error: () => {
+          setLoadingId(null);
+          toast(online ? "Couldn't delete attachment." : "Attachments can't be deleted while offline.");
+        },
       });
   };
 

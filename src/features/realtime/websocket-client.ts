@@ -21,9 +21,15 @@ export class WebSocketClient {
   private reconnectDelay = RECONNECT_INITIAL_MS;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private wantOpen = false;
+  private hasConnected = false;
   private readonly subject = new Subject<RealtimeEvent>();
+  private readonly reconnectedSubject = new Subject<void>();
 
   readonly incoming$: Observable<RealtimeEvent> = this.subject.asObservable();
+
+  // Fires when a dropped connection comes back; events sent while we were
+  // disconnected are lost, so listeners should resync.
+  readonly reconnected$: Observable<void> = this.reconnectedSubject.asObservable();
 
   start(): void {
     this.wantOpen = true;
@@ -32,6 +38,7 @@ export class WebSocketClient {
 
   stop(): void {
     this.wantOpen = false;
+    this.hasConnected = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -69,6 +76,12 @@ export class WebSocketClient {
 
     socket.addEventListener("open", () => {
       this.reconnectDelay = RECONNECT_INITIAL_MS;
+
+      if (this.hasConnected) {
+        this.reconnectedSubject.next();
+      }
+
+      this.hasConnected = true;
     });
 
     socket.addEventListener("message", (event) => {

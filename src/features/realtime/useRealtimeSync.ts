@@ -43,8 +43,15 @@ export const useRealtimeSync = (): void => {
       )
       .subscribe(triggerSync);
 
+    const reconnectSub = client.reconnected$.subscribe(() => {
+      useNotebooksSlice.getState().resync().pipe(take(1)).subscribe({
+        error: (err) => console.warn("reconnect resync failed", err),
+      });
+    });
+
     return () => {
       sub.unsubscribe();
+      reconnectSub.unsubscribe();
       client.stop();
     };
   }, [isAuthed]);

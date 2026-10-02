@@ -59,7 +59,7 @@ const PlaceholderListItem = () => (
 const RecentNotes = () => {
   const { recentNotes, loaded, loadRecentNotes } = useRecentNotesSlice();
   const { notebooks } = useNotebooksSlice();
-  const { updateNote, deleteNote } = useNotesSlice();
+  const { updateNote, deleteNote, setNoteArchived } = useNotesSlice();
   const { mask } = useMaskSlice();
   const myUserId = useAuthSlice((s) => s.user?.id);
   const navigate = useNavigate();
@@ -68,6 +68,7 @@ const RecentNotes = () => {
   const [renameNote, setRenameNote] = useState<Note | null>(null);
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Note | null>(null);
   const [tagsNote, setTagsNote] = useState<Note | null>(null);
 
   const allTags = [...new Set(recentNotes.flatMap((n) => n.tags ?? []))];
@@ -101,6 +102,24 @@ const RecentNotes = () => {
         error: () => {
           unmask();
           setRenameNote(null);
+        },
+      });
+  };
+
+  const handleArchive = () => {
+    if (!archiveTarget) return;
+    const unmask = mask("Archiving note...");
+    setNoteArchived(archiveTarget.id, archiveTarget.notebookId, true)
+      .pipe(take(1))
+      .subscribe({
+        complete: () => {
+          unmask();
+          setArchiveTarget(null);
+          loadRecentNotes().pipe(take(1)).subscribe();
+        },
+        error: () => {
+          unmask();
+          setArchiveTarget(null);
         },
       });
   };
@@ -202,6 +221,7 @@ const RecentNotes = () => {
                 onMove={owned ? () => setMoveNote(note) : undefined}
                 onTags={noteEditable ? () => setTagsNote(note) : undefined}
                 onTagClick={handleTagClick}
+                onArchive={owned ? () => setArchiveTarget(note) : undefined}
                 onDelete={owned ? () => setDeleteTarget(note) : undefined}
               />
             );
@@ -263,6 +283,14 @@ const RecentNotes = () => {
         note={moveNote}
         onMove={handleMove}
         onCancel={() => setMoveNote(null)}
+      />
+
+      <DeleteConfirmDialog
+        open={archiveTarget !== null}
+        title="Archive Note"
+        message={`Are you sure you want to archive "${archiveTarget?.title}"? You can find it under Archived.`}
+        onConfirm={handleArchive}
+        onCancel={() => setArchiveTarget(null)}
       />
 
       <DeleteConfirmDialog

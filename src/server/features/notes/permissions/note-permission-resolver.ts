@@ -3,6 +3,7 @@ import { PermissionResolver } from "@/server/permissions";
 import { getShareAccessService } from "@/server/features/shares";
 import { ConflictError, NotFoundError } from "@/server/errors";
 import { getNoteService } from "../services";
+import { changesArchivedAt } from "./archive";
 
 export class NotePermissionResolver implements PermissionResolver<Note> {
   canCreate(userId: string, entity: Note): Observable<boolean> {
@@ -45,7 +46,10 @@ export class NotePermissionResolver implements PermissionResolver<Note> {
             .getNoteAccess(userId, entity.id, existing.notebookId)
             .pipe(
               map((level) => {
-                if (isMove || existing.deletedAt) return level === "owner";
+                if (isMove || existing.deletedAt || changesArchivedAt(entity, existing)) {
+                  return level === "owner";
+                }
+
                 return level === "owner" || level === "readwrite";
               })
             );

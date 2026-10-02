@@ -80,18 +80,23 @@ export const setLastSync = async (userId: string, timestamp: string): Promise<vo
   await db.put("meta", { key: "lastSync", value: timestamp });
 };
 
-// Clears the cached entities + sync metadata but PRESERVES the offline mutation
-// queue and cached attachment blobs. Used by the stale-cache path so a forced
-// full re-sync never discards unflushed local work or downloaded attachments.
-export const clearEntityCache = async (userId: string): Promise<void> => {
+// Client clock time of the last successful sync. Unlike `lastSync` (a server
+// cursor based on owned items' updatedAt) this measures how stale the cache is.
+export const getLastSyncedAt = async (userId: string): Promise<number | null> => {
   const db = await getCacheDb(userId);
-  const tx = db.transaction(["notebooks", "notes", "meta"], "readwrite");
-  await Promise.all([
-    tx.objectStore("notebooks").clear(),
-    tx.objectStore("notes").clear(),
-    tx.objectStore("meta").clear(),
-    tx.done,
-  ]);
+  const record = await db.get("meta", "lastSyncedAt");
+  return record?.value ?? null;
+};
+
+export const setLastSyncedAt = async (userId: string, timestamp: number): Promise<void> => {
+  const db = await getCacheDb(userId);
+  await db.put("meta", { key: "lastSyncedAt", value: timestamp });
+};
+
+export const hasCachedEntities = async (userId: string): Promise<boolean> => {
+  const db = await getCacheDb(userId);
+  const [notebooks, notes] = await Promise.all([db.count("notebooks"), db.count("notes")]);
+  return notebooks > 0 || notes > 0;
 };
 
 export const replaceEntityCache = async (

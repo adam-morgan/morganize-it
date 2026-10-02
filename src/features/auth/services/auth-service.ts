@@ -2,6 +2,7 @@ import { apiGet, apiPost, getAuthToken, setAuthToken, setRefreshToken } from "@/
 import { catchError, map, Observable, of, tap } from "rxjs";
 
 const CACHED_USER_KEY = "authUser";
+const WHOAMI_TIMEOUT_MS = 6_000;
 
 // Persist the signed-in user so the session can be restored offline (when
 // /auth/whoami can't be reached) without bouncing to the login screen.
@@ -42,18 +43,19 @@ class AuthService {
       return of({ id: "0", name: "Guest", email: "", isGuest: true } as GuestUser);
     }
 
-    return apiGet<User>("/auth/whoami").pipe(
+    return apiGet<User>("/auth/whoami", { timeoutMs: WHOAMI_TIMEOUT_MS }).pipe(
       tap((user) => setCachedUser(user)),
       catchError((err: unknown) => {
         // A real auth failure (e.g. 401) carries an HTTP status → force login.
-        // A network failure (offline) has no status → restore the last known
-        // user so the cached app stays usable offline.
+        // A network failure (offline, timeout) or a server/gateway error says
+        // nothing about the session → restore the last known user so the
+        // cached app stays usable.
         const status =
           err && typeof err === "object" && "status" in err
             ? (err as { status?: number }).status
             : undefined;
 
-        if (status === undefined && getAuthToken()) {
+        if ((status === undefined || status >= 500) && getAuthToken()) {
           return of(getCachedUser());
         }
 

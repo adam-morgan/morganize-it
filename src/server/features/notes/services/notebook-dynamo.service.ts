@@ -73,7 +73,7 @@ export class NotebookDynamoService extends UserEntityReactiveDynamoService<Noteb
 
     return this.findById(id).pipe(
       switchMap((notebook) =>
-        super.update(id, { ...notebook, deletedAt: now, updatedAt: now })
+        super.update(id, { ...notebook, deletedAt: now, archivedAt: null, updatedAt: now })
       ),
       switchMap(() => {
         // Cascade soft-delete to notes in this notebook
@@ -88,7 +88,7 @@ export class NotebookDynamoService extends UserEntityReactiveDynamoService<Noteb
             const updates = result.items
               .filter((note) => !note.deletedAt)
               .map((note) =>
-                notesSvc.update(note.id, { ...note, deletedAt: now, updatedAt: now })
+                notesSvc.update(note.id, { ...note, deletedAt: now, archivedAt: null, updatedAt: now })
               );
             if (updates.length === 0) return of(undefined);
             return concat(...updates).pipe(

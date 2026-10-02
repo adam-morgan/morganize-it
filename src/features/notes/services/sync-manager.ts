@@ -1,10 +1,12 @@
-import { from, map, Observable, switchMap } from "rxjs";
+import { from, Observable, switchMap } from "rxjs";
 import { apiPost } from "@/utils/fetch";
 import {
   getCacheDb,
   getLastSync,
   setLastSync,
-  clearEntityCache,
+  getLastSyncedAt,
+  setLastSyncedAt,
+  hasCachedEntities,
   replaceEntityCache,
 } from "./cache-db";
 import { getQueueProcessor } from "./queue-processor";
@@ -29,18 +31,14 @@ export class SyncManager {
     // every sync trigger (visibility, poll, realtime push, share, startup) funnels
     // through, so it's the only place this ordering needs to be enforced.
     return from(getQueueProcessor(this.userId).flushIfOnline()).pipe(
-      switchMap(() => from(getLastSync(this.userId))),
-      switchMap((lastSync) => {
-        const isStale =
-          lastSync != null &&
-          Date.now() - new Date(lastSync).getTime() > STALE_THRESHOLD_MS;
+      switchMap(() => from(Promise.all([getLastSync(this.userId), getLastSyncedAt(this.userId)]))),
+      switchMap(([lastSync, lastSyncedAt]) => {
+        const isStale = lastSyncedAt != null && Date.now() - lastSyncedAt > STALE_THRESHOLD_MS;
 
-        // Only clear-and-refetch when we can actually reach the server. Clearing
-        // while offline would wipe the cache the user is relying on offline.
+        // The full refetch replaces the cache only once the response arrives,
+        // so a failed request leaves the offline cache intact.
         if (isStale && isOnline()) {
-          return from(clearEntityCache(this.userId)).pipe(
-            switchMap(() => this.fetchAndApply(null))
-          );
+          return this.fetchAndReplace();
         }
 
         return this.fetchAndApply(lastSync);
@@ -49,14 +47,21 @@ export class SyncManager {
   }
 
   fullResync(): Observable<SyncResult> {
-    return from(this.pushPendingChanges()).pipe(
-      switchMap(() => apiPost<{ lastSync?: string }, SyncResponse>("/sync", {})),
-      switchMap((response) => from(this.replaceAll(response)))
-    );
+    return from(this.pushPendingChanges()).pipe(switchMap(() => this.fetchAndReplace()));
   }
 
   hasCache(): Observable<boolean> {
-    return from(getLastSync(this.userId)).pipe(map((v) => v != null));
+    return from(
+      getLastSync(this.userId).then(
+        async (lastSync) => lastSync != null || (await hasCachedEntities(this.userId))
+      )
+    );
+  }
+
+  private fetchAndReplace(): Observable<SyncResult> {
+    return apiPost<{ lastSync?: string }, SyncResponse>("/sync", {}).pipe(
+      switchMap((response) => from(this.replaceAll(response)))
+    );
   }
 
   private fetchAndApply(lastSync: string | null): Observable<SyncResult> {
@@ -120,6 +125,8 @@ export class SyncManager {
       }
     }
 
+    await setLastSyncedAt(this.userId, Date.now());
+
     return this.readCurrentState();
   }
 
@@ -128,7 +135,7 @@ export class SyncManager {
       throw new Error("You're offline. Reconnect to resync your data.");
     }
 
-    await getQueueProcessor(this.userId).flush();
+    await getQueueProcessor(this.userId).retryFailed();
 
     const { pending } = await counts(this.userId);
 
@@ -146,6 +153,8 @@ export class SyncManager {
       response.notes.filter((note) => !note.deletedAt),
       this.latestOwnedTimestamp(response) ?? new Date().toISOString()
     );
+
+    await setLastSyncedAt(this.userId, Date.now());
 
     return this.readCurrentState();
   }

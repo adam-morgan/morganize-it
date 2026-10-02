@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { useAuthSlice } from "../auth";
 import { getNotesService } from "./services";
+import { getCacheDb } from "./services/cache-db";
 import { Observable, take, tap } from "rxjs";
 
 export type NoteSortOption = "lastOpenedAt" | "updatedAt" | "createdAt" | "titleAsc" | "titleDesc";
@@ -13,6 +14,8 @@ type NotesSlice = {
   expandNotebook: (id: string | null) => void;
   createNote: (notebookId: string, title: string) => Observable<Note>;
   updateNote: (id: string, notebookId: string, data: Partial<Note>) => Observable<Note>;
+  setNoteArchived: (id: string, notebookId: string, archived: boolean) => Observable<Note>;
+  mergeLocalNote: (id: string, notebookId: string, data: Partial<Note>) => Promise<void>;
   markNoteOpened: (id: string, notebookId: string) => Observable<Note>;
   deleteNote: (id: string, notebookId: string) => Observable<void>;
   setSortBy: (option: NoteSortOption) => void;
@@ -124,6 +127,27 @@ export const useNotesSlice = create<NotesSlice>((set, get) => ({
         });
       })
     );
+  },
+  setNoteArchived: (id, notebookId, archived) =>
+    get().updateNote(id, notebookId, { archivedAt: archived ? new Date().toISOString() : null }),
+  mergeLocalNote: async (id, notebookId, data) => {
+    set((state) => ({
+      notes: {
+        ...state.notes,
+        [notebookId]: (state.notes[notebookId] ?? []).map((n) => (n.id === id ? { ...n, ...data } : n)),
+      },
+    }));
+
+    const user = useAuthSlice.getState().user;
+
+    if (!user || (user as GuestUser).isGuest) return;
+
+    const db = await getCacheDb(user.id);
+    const existing = await db.get("notes", id);
+
+    if (existing) {
+      await db.put("notes", { ...existing, ...data });
+    }
   },
   markNoteOpened: (id, notebookId) => {
     const user = useAuthSlice.getState().user;

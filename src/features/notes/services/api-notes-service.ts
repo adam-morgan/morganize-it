@@ -17,6 +17,10 @@ export class ApiNotesService implements NotesService {
     return apiPatch<Partial<Notebook>, Notebook>(`/notebooks/${id}`, { name });
   }
 
+  setNotebookArchived(id: string, archivedAt: string | null): Observable<Notebook> {
+    return apiPatch<Partial<Notebook>, Notebook>(`/notebooks/${id}`, { archivedAt });
+  }
+
   deleteNotebook(id: string): Observable<void> {
     return apiDelete<void>(`/notebooks/${id}`);
   }

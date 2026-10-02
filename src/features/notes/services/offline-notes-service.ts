@@ -45,7 +45,11 @@ export class OfflineNotesService extends CachedNotesService {
   }
 
   updateNotebook(id: string, name: string): Observable<Notebook> {
-    return from(this.persistNotebookUpdate(id, name));
+    return from(this.persistNotebookUpdate(id, { name }));
+  }
+
+  setNotebookArchived(id: string, archivedAt: string | null): Observable<Notebook> {
+    return from(this.persistNotebookUpdate(id, { archivedAt }));
   }
 
   deleteNotebook(id: string): Observable<void> {
@@ -107,20 +111,23 @@ export class OfflineNotesService extends CachedNotesService {
     return merged;
   }
 
-  private async persistNotebookUpdate(id: string, name: string): Promise<Notebook> {
+  private async persistNotebookUpdate(
+    id: string,
+    data: Pick<Partial<Notebook>, "name" | "archivedAt">
+  ): Promise<Notebook> {
     const now = new Date().toISOString();
     const db = await getCacheDb(this.userId);
     const existing = (await db.get("notebooks", id)) as Notebook | undefined;
     const merged = {
       ...(existing ?? { id, userId: this.userId }),
+      ...data,
       id,
-      name,
       updatedAt: now,
     } as Notebook;
 
     await db.put("notebooks", merged);
-    // Server overrides updatedAt for notebooks, so the body only carries name.
-    await enqueueUpdate(this.userId, "notebook", id, { name });
+    // Server overrides updatedAt for notebooks, so the body only carries the changed fields.
+    await enqueueUpdate(this.userId, "notebook", id, { ...data });
 
     this.afterWrite();
     return merged;
@@ -141,7 +148,7 @@ export class OfflineNotesService extends CachedNotesService {
       // Mirror the server's soft delete so a replay/sync can reconcile it.
       const existing = (await db.get(store, id)) as Record<string, unknown> | undefined;
       if (existing) {
-        await db.put(store, { ...existing, deletedAt: new Date().toISOString() });
+        await db.put(store, { ...existing, deletedAt: new Date().toISOString(), archivedAt: null });
       }
     }
 
@@ -174,11 +181,11 @@ export class OfflineNotesService extends CachedNotesService {
 
       const nb = (await tx.objectStore("notebooks").get(id)) as Record<string, unknown> | undefined;
       if (nb) {
-        await tx.objectStore("notebooks").put({ ...nb, deletedAt: now });
+        await tx.objectStore("notebooks").put({ ...nb, deletedAt: now, archivedAt: null });
       }
 
       for (const note of childNotes) {
-        await tx.objectStore("notes").put({ ...note, deletedAt: now });
+        await tx.objectStore("notes").put({ ...note, deletedAt: now, archivedAt: null });
       }
 
       await tx.done;

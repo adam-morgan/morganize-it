@@ -145,14 +145,22 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
     setFiles((prev) => prev.map((f, idx) => (idx === index ? { ...f, status, error } : f)));
   };
 
+  const persistAttachments = async (attachments: Attachment[]): Promise<void> => {
+    const db = await getCacheDb(userId!);
+    const note = (await db.get("notes", noteId)) as Note | undefined;
+
+    if (note) {
+      await db.put("notes", { ...note, attachments });
+    }
+  };
+
   // Offline: store the blob locally, queue the upload for replay, and
   // optimistically append the attachment to the cached note so it's usable now.
-  const uploadOffline = async (): Promise<void> => {
+  const uploadOffline = async (indices: number[]): Promise<void> => {
     let latestNote: Note | null = null;
 
-    for (let i = 0; i < files.length; i++) {
+    for (const i of indices) {
       const entry = files[i];
-      if (entry.error || entry.status !== "pending") continue;
 
       setStatus(i, "uploading");
 
@@ -160,7 +168,9 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
         const tempId = uuid();
         const mimeType = entry.file.type || "application/octet-stream";
 
-        const stored = await putAttachmentBlob(userId!, noteId, tempId, entry.file, entry.displayName, mimeType);
+        const stored = await putAttachmentBlob(userId!, noteId, tempId, entry.file, entry.displayName, mimeType, {
+          pinned: true,
+        });
         if (!stored) {
           throw new Error("File too large to store offline");
         }
@@ -190,13 +200,16 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
   };
 
   const handleUpload = async () => {
-    const valid = files.filter((f) => !f.error && f.status === "pending");
-    if (valid.length === 0) return;
+    const validIndices = files
+      .map((f, i) => (!f.error && f.status === "pending" ? i : -1))
+      .filter((i) => i >= 0);
+
+    if (validIndices.length === 0) return;
 
     setUploading(true);
 
     if (!online && userId) {
-      await uploadOffline();
+      await uploadOffline(validIndices);
       return;
     }
 
@@ -208,9 +221,8 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
 
     let latestNote: Note | null = null;
 
-    for (let i = 0; i < files.length; i++) {
+    for (const [position, i] of validIndices.entries()) {
       const entry = files[i];
-      if (entry.error || entry.status !== "pending") continue;
 
       setStatus(i, "uploading");
 
@@ -223,6 +235,10 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
           confirmUpload(noteId, fileId, entry.displayName, entry.file.type || "application/octet-stream")
         );
         latestNote = updated;
+
+        if (userId) {
+          await persistAttachments(updated.attachments ?? []).catch(() => {});
+        }
 
         // Cache the bytes we already have so the attachment opens offline later.
         if (userId) {
@@ -238,6 +254,17 @@ const AttachmentUploadDialog = ({ open, noteId, onClose, onUploaded }: Props) =>
 
         setStatus(i, "done");
       } catch (err) {
+        // The request never reached the server: queue this and the remaining
+        // files for upload on reconnect instead of failing them.
+        if ((err as { status?: number }).status === undefined && userId) {
+          if (latestNote) {
+            onUploaded(latestNote);
+          }
+
+          await uploadOffline(validIndices.slice(position));
+          return;
+        }
+
         setStatus(i, "error", (err as Error).message);
       }
     }

@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Trash2, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrashSlice } from "../trashSlice";
 import { useNetworkSlice } from "@/features/network/networkSlice";
 import { useReactiveQueryWithMask } from "@/hooks/useReactiveQuery";
 import DeleteConfirmDialog from "./DeleteConfirmDialog";
-import { useState } from "react";
+import StashView, { formatStashDate } from "./stash/StashView";
 
 const TrashView = () => {
   const {
@@ -57,13 +57,6 @@ const TrashView = () => {
     reactiveQuery(() => emptyTrash(), "Emptying trash...", () => {});
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  };
-
-  const hasItems = deletedNotebooks.length > 0 || deletedNotes.length > 0;
-
   if (!online) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -77,103 +70,39 @@ const TrashView = () => {
   if (!loaded) return null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      {hasItems && (
-        <div className="mb-6 flex justify-end">
-          <Button variant="destructive" size="sm" onClick={() => setConfirmEmpty(true)}>
+    <>
+      <StashView
+        notebooks={deletedNotebooks}
+        notes={deletedNotes}
+        emptyIcon={Trash2}
+        emptyMessage="Trash is empty"
+        searchPlaceholder="Search trash..."
+        headerActions={
+          <Button variant="destructive" size="sm" className="cursor-pointer" onClick={() => setConfirmEmpty(true)}>
             Empty Trash
           </Button>
-        </div>
-      )}
-
-      {!hasItems && (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-          <Trash2 className="mb-3 h-12 w-12 opacity-30" />
-          <p>Trash is empty</p>
-        </div>
-      )}
-
-      {deletedNotebooks.length > 0 && (
-        <div className="mb-6">
-          <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">Notebooks</h2>
-          <div className="space-y-1">
-            {deletedNotebooks.map((nb) => (
-              <div
-                key={nb.id}
-                className="flex items-center justify-between rounded-md border px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium">{nb.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Deleted {nb.deletedAt ? formatDate(nb.deletedAt) : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Restore"
-                    onClick={() => handleRestore("notebook", nb.id)}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    title="Delete permanently"
-                    onClick={() => setDeleteTarget({ type: "notebook", id: nb.id, name: nb.name })}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {deletedNotes.length > 0 && (
-        <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">Notes</h2>
-          <div className="space-y-1">
-            {deletedNotes.map((note) => (
-              <div
-                key={note.id}
-                className="flex items-center justify-between rounded-md border px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium">{note.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Deleted {note.deletedAt ? formatDate(note.deletedAt) : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    title="Restore"
-                    onClick={() => handleRestore("note", note.id)}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    title="Delete permanently"
-                    onClick={() => setDeleteTarget({ type: "note", id: note.id, name: note.title })}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        }
+        notebookSubtitle={(nb) => `Deleted ${formatStashDate(nb.deletedAt)}`}
+        noteSubtitle={(note) => `Deleted ${formatStashDate(note.deletedAt)}`}
+        notebookActions={(nb) => [
+          { title: "Restore", icon: RotateCcw, onClick: () => handleRestore("notebook", nb.id) },
+          {
+            title: "Delete permanently",
+            icon: X,
+            destructive: true,
+            onClick: () => setDeleteTarget({ type: "notebook", id: nb.id, name: nb.name }),
+          },
+        ]}
+        noteActions={(note) => [
+          { title: "Restore", icon: RotateCcw, onClick: () => handleRestore("note", note.id) },
+          {
+            title: "Delete permanently",
+            icon: X,
+            destructive: true,
+            onClick: () => setDeleteTarget({ type: "note", id: note.id, name: note.title }),
+          },
+        ]}
+      />
 
       <DeleteConfirmDialog
         open={deleteTarget !== null}
@@ -190,7 +119,7 @@ const TrashView = () => {
         onConfirm={handleEmptyTrash}
         onCancel={() => setConfirmEmpty(false)}
       />
-    </div>
+    </>
   );
 };
 

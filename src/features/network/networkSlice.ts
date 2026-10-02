@@ -2,8 +2,8 @@ import { create } from "zustand";
 
 type NetworkSlice = {
   // Whether the app currently believes it can reach the server. Seeded from
-  // navigator.onLine but treated as a hint — the authoritative signal is a
-  // network-class failure while flushing the mutation queue.
+  // navigator.onLine but treated as a hint — the authoritative signal is
+  // whether API requests get a response (see utils/fetch).
   online: boolean;
 
   // Number of queued offline writes not yet confirmed by the server.

@@ -35,6 +35,9 @@ export const uploadFileToUrl = async (uploadUrl: string, file: Blob): Promise<vo
     headers: { "Content-Type": file.type },
   });
   if (!response.ok) {
-    throw new Error(`Upload failed: ${response.statusText}`);
+    const error = new Error(`Upload failed: ${response.statusText}`) as Error & { status: number };
+    error.status = response.status;
+
+    throw error;
   }
 };

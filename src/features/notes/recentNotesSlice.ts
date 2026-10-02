@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { from, map, Observable, tap } from "rxjs";
-import { openDB } from "idb";
 import { useAuthSlice } from "@/features/auth";
-import { getCacheDb } from "./services/cache-db";
+import { getAllLocalNotebooks, getAllLocalNotes } from "./services/local-entities";
+import { archivedNotebookIdsOf, isNoteArchived } from "./archive-utils";
 
 type RecentNotesSlice = {
   recentNotes: Note[];
@@ -12,20 +12,15 @@ type RecentNotesSlice = {
 };
 
 async function getRecentNotesFromIdb(user: User): Promise<Note[]> {
-  if ((user as GuestUser).isGuest) {
-    const db = await openDB("morganizeit", 2);
-    const allNotes: Note[] = await db.getAll("notes");
-    return allNotes
-      .filter((n) => !n.deletedAt)
-      .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))
-      .slice(0, 10);
-  }
+  const [allNotes, allNotebooks] = await Promise.all([
+    getAllLocalNotes(user),
+    getAllLocalNotebooks(user),
+  ]);
 
-  const db = await getCacheDb(user.id);
-  const allNotes = (await db.getAll("notes")) as Note[];
+  const archivedNotebookIds = archivedNotebookIdsOf(allNotebooks);
 
   return allNotes
-    .filter((n) => !n.deletedAt)
+    .filter((n) => !n.deletedAt && !isNoteArchived(n, archivedNotebookIds))
     .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))
     .slice(0, 10);
 }

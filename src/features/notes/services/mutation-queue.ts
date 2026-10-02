@@ -203,12 +203,39 @@ export const enqueueDelete = async (
   return { neverSynced: false, droppedNoteIds };
 };
 
-// Mutations eligible to send right now, in FIFO order.
+// Mutations eligible to send right now, in FIFO order. Stops at the first one
+// still backing off so a later mutation never overtakes one it may depend on
+// (e.g. a note create overtaking its notebook create).
 export const listForFlush = async (userId: string, now: number): Promise<PendingMutation[]> => {
   const all = await getAll(userId);
-  return all
-    .filter((m) => m.status === "pending" && (m.nextAttempt == null || m.nextAttempt <= now))
+  const pending = all
+    .filter((m) => m.status === "pending")
     .sort((a, b) => a.timestamp - b.timestamp || a.seq - b.seq);
+
+  const ready: PendingMutation[] = [];
+
+  for (const m of pending) {
+    if (m.nextAttempt != null && m.nextAttempt > now) break;
+
+    ready.push(m);
+  }
+
+  return ready;
+};
+
+export const retryFailed = async (userId: string): Promise<number> => {
+  const db = await getCacheDb(userId);
+  const tx = db.transaction(STORE, "readwrite");
+  const all = (await tx.store.getAll()) as PendingMutation[];
+  const failed = all.filter((m) => m.status === "failed");
+
+  for (const m of failed) {
+    await tx.store.put({ ...m, status: "pending", retryCount: 0, nextAttempt: undefined });
+  }
+
+  await tx.done;
+
+  return failed.length;
 };
 
 export const putMutation = async (userId: string, mutation: PendingMutation): Promise<void> => {

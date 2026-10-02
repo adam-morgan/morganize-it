@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { take } from "rxjs";
-import { openDB } from "idb";
-import { LayoutGrid, List, Search, X, ArrowUpDown, Check } from "lucide-react";
+import { LayoutGrid, List, ArrowUpDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +12,9 @@ import {
 import { useAuthSlice } from "@/features/auth";
 import { useNotesSlice, NoteSortOption } from "../notesSlice";
 import { useMaskSlice } from "@/features/app";
-import { getCacheDb } from "../services/cache-db";
+import { getAllLocalNotebooks, getAllLocalNotes } from "../services/local-entities";
+import { archivedNotebookIdsOf, isNoteArchived } from "../archive-utils";
+import SearchInput from "./stash/SearchInput";
 import NoteCard from "./NoteCard";
 import NoteListItem from "./NoteListItem";
 import MoveNoteDialog from "./MoveNoteDialog";
@@ -66,21 +66,12 @@ const sortNotes = (notes: Note[], sortBy: NoteSortOption): Note[] => {
   }
 };
 
-async function getAllNotes(user: User): Promise<Note[]> {
-  if ((user as GuestUser).isGuest) {
-    const db = await openDB("morganizeit", 2);
-    return db.getAll("notes");
-  }
-  const db = await getCacheDb(user.id);
-  return db.getAll("notes");
-}
-
 const TagView = () => {
   const { tagName } = useParams<{ tagName: string }>();
   const decodedTag = tagName ? decodeURIComponent(tagName) : "";
   const navigate = useNavigate();
   const { user } = useAuthSlice();
-  const { updateNote, deleteNote } = useNotesSlice();
+  const { updateNote, deleteNote, setNoteArchived } = useNotesSlice();
   const { mask } = useMaskSlice();
 
   const isMobile = useIsMobile();
@@ -93,6 +84,7 @@ const TagView = () => {
   const [renameNote, setRenameNote] = useState<Note | null>(null);
   const [moveNote, setMoveNote] = useState<Note | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Note | null>(null);
   const [tagsNote, setTagsNote] = useState<Note | null>(null);
 
   const effectiveViewMode = isMobile ? "list" : viewMode;
@@ -100,9 +92,16 @@ const TagView = () => {
   const loadTaggedNotes = useCallback(async () => {
     if (!user || !decodedTag) return;
     try {
-      const allNotes = await getAllNotes(user);
+      const [allNotes, allNotebooks] = await Promise.all([
+        getAllLocalNotes(user),
+        getAllLocalNotebooks(user),
+      ]);
+      const archivedNotebookIds = archivedNotebookIdsOf(allNotebooks);
       const filtered = allNotes.filter(
-        (n) => !n.deletedAt && (n.tags ?? []).includes(decodedTag),
+        (n) =>
+          !n.deletedAt &&
+          !isNoteArchived(n, archivedNotebookIds) &&
+          (n.tags ?? []).includes(decodedTag),
       );
       setTaggedNotes(filtered);
     } catch {
@@ -152,28 +151,35 @@ const TagView = () => {
       });
   };
 
+  const handleArchive = () => {
+    if (!archiveTarget) return;
+    const unmask = mask("Archiving note...");
+    setNoteArchived(archiveTarget.id, archiveTarget.notebookId, true)
+      .pipe(take(1))
+      .subscribe({
+        complete: () => {
+          unmask();
+          setArchiveTarget(null);
+          loadTaggedNotes();
+        },
+        error: () => {
+          unmask();
+          setArchiveTarget(null);
+        },
+      });
+  };
+
   if (loading) return null;
 
   return (
     <div className="p-6">
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-48 pl-9 pr-8"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search notes..."
+          className="w-48"
+        />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="cursor-pointer" title="Sort notes">
@@ -232,6 +238,7 @@ const TagView = () => {
               onMove={() => setMoveNote(note)}
               onTags={() => setTagsNote(note)}
               onTagClick={handleTagClick}
+              onArchive={note.userId === user?.id ? () => setArchiveTarget(note) : undefined}
               onDelete={() => setDeleteTarget(note)}
             />
           ))}
@@ -248,6 +255,7 @@ const TagView = () => {
               onMove={() => setMoveNote(note)}
               onTags={() => setTagsNote(note)}
               onTagClick={handleTagClick}
+              onArchive={note.userId === user?.id ? () => setArchiveTarget(note) : undefined}
               onDelete={() => setDeleteTarget(note)}
             />
           ))}
@@ -300,6 +308,14 @@ const TagView = () => {
             });
         }}
         onCancel={() => setMoveNote(null)}
+      />
+
+      <DeleteConfirmDialog
+        open={archiveTarget !== null}
+        title="Archive Note"
+        message={`Are you sure you want to archive "${archiveTarget?.title}"? You can find it under Archived.`}
+        onConfirm={handleArchive}
+        onCancel={() => setArchiveTarget(null)}
       />
 
       <DeleteConfirmDialog

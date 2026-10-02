@@ -66,6 +66,8 @@ import {
   X,
   Palette,
   Ban,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -88,6 +90,8 @@ import { ShareDialog } from "@/features/shares";
 import { useAuthSlice } from "@/features/auth";
 import AttachmentList from "../components/AttachmentList";
 import AttachmentUploadDialog from "./AttachmentUploadDialog";
+import ArchivedBanner from "./stash/ArchivedBanner";
+import { useArchivedNotebookIds } from "../archive-utils";
 
 // --- Suggestion items (slash commands) ---
 
@@ -785,11 +789,12 @@ type NoteEditorProps = {
 
 const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
   const navigate = useNavigate();
-  const { notes: allNotesMap, updateNote, deleteNote } = useNotesSlice();
+  const { notes: allNotesMap, updateNote, deleteNote, setNoteArchived, mergeLocalNote } = useNotesSlice();
   const { mask } = useMaskSlice();
   const [title, setTitle] = useState(note.title);
   const [tags, setTags] = useState<string[]>(note.tags ?? []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [showTagsDialog, setShowTagsDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -820,6 +825,9 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
   const canDeleteNote = isNoteOwner;
   const canMoveNote = isNoteOwner;
   const canShareNote = isNoteOwner;
+  const canArchiveNote = isNoteOwner;
+  const isNoteArchived = !!note.archivedAt;
+  const isNotebookArchived = useArchivedNotebookIds().has(note.notebookId);
 
   const initialContent = note.content ? tryParseJSON(note.content) : undefined;
 
@@ -941,6 +949,13 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
     lastAppliedUpdatedAtRef.current = note.updatedAt;
   }, [note.updatedAt, note.title, note.content, note.tags, note.attachments]);
 
+  // Persist attachment changes to the slice and IndexedDB so they survive
+  // leaving the note and are available offline straight away.
+  const handleAttachmentsChange = (next: Attachment[]) => {
+    setAttachments(next);
+    void mergeLocalNote(note.id, note.notebookId, { attachments: next }).catch(() => {});
+  };
+
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
     setTitle(newTitle);
@@ -956,6 +971,22 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
       },
       error: () => {
         unmask();
+      },
+    });
+  };
+
+  const handleSetArchived = (archived: boolean) => {
+    const unmask = mask(archived ? "Archiving note..." : "Unarchiving note...");
+    setNoteArchived(note.id, note.notebookId, archived).pipe(take(1)).subscribe({
+      complete: () => {
+        unmask();
+        setShowArchiveConfirm(false);
+
+        if (archived) onBack();
+      },
+      error: () => {
+        unmask();
+        setShowArchiveConfirm(false);
       },
     });
   };
@@ -1018,6 +1049,14 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
                     Share...
                   </DropdownMenuItem>
                 )}
+                {canArchiveNote && (
+                  <DropdownMenuItem
+                    onClick={() => (isNoteArchived ? handleSetArchived(false) : setShowArchiveConfirm(true))}
+                  >
+                    {isNoteArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    {isNoteArchived ? "Unarchive" : "Archive"}
+                  </DropdownMenuItem>
+                )}
                 {canDeleteNote && (
                   <DropdownMenuItem variant="destructive" onClick={() => setShowDeleteConfirm(true)}>
                     <Trash2 className="h-4 w-4" />
@@ -1037,12 +1076,21 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
         )}
       </div>
 
+      {(isNoteArchived || isNotebookArchived) && (
+        <div className="px-4 pt-3">
+          <ArchivedBanner
+            message={isNoteArchived ? "This note is archived." : "This note is in an archived notebook."}
+            onUnarchive={isNoteArchived && canArchiveNote ? () => handleSetArchived(false) : undefined}
+          />
+        </div>
+      )}
+
       {attachments.length > 0 && (
         <AttachmentList
           noteId={note.id}
           attachments={attachments}
           canEdit={canEdit}
-          onAttachmentsChange={setAttachments}
+          onAttachmentsChange={handleAttachmentsChange}
         />
       )}
 
@@ -1051,6 +1099,14 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
         note={note}
         onMove={handleMove}
         onCancel={() => setShowMoveDialog(false)}
+      />
+
+      <DeleteConfirmDialog
+        open={showArchiveConfirm}
+        title="Archive Note"
+        message={`Are you sure you want to archive "${title}"? You can find it under Archived.`}
+        onConfirm={() => handleSetArchived(true)}
+        onCancel={() => setShowArchiveConfirm(false)}
       />
 
       <DeleteConfirmDialog
@@ -1100,7 +1156,7 @@ const NoteEditor = ({ note, onBack }: NoteEditorProps) => {
           noteId={note.id}
           onClose={() => setShowUploadDialog(false)}
           onUploaded={(updatedNote) => {
-            setAttachments(updatedNote.attachments ?? []);
+            handleAttachmentsChange(updatedNote.attachments ?? []);
             setShowUploadDialog(false);
           }}
         />

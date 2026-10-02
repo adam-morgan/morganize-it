@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Pencil, FolderInput, Tag, Share2, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, FolderInput, Tag, Share2, Trash2, Archive } from "lucide-react";
 import { HighlightedText, getSnippet, SnippetText } from "../search/search-utils";
 import TagBadge from "../components/TagBadge";
 
@@ -19,6 +19,7 @@ type NoteCardProps = {
   onTags?: () => void;
   onShare?: () => void;
   onTagClick: (tag: string) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 };
 
@@ -37,7 +38,7 @@ export const formatRelativeTime = (isoDate: string): string => {
   return date.toLocaleDateString();
 };
 
-const NoteCard = ({ note, query, onClick, onRename, onMove, onTags, onShare, onTagClick, onDelete }: NoteCardProps) => {
+const NoteCard = ({ note, query, onClick, onRename, onMove, onTags, onShare, onTagClick, onArchive, onDelete }: NoteCardProps) => {
   const snippet = query ? getSnippet(note.textContent, query) : null;
 
   return (
@@ -49,7 +50,7 @@ const NoteCard = ({ note, query, onClick, onRename, onMove, onTags, onShare, onT
         <CardTitle className="text-sm font-medium leading-tight line-clamp-2 flex-1 pr-2">
           {query ? HighlightedText({ text: note.title, query }) : note.title}
         </CardTitle>
-        {(onRename || onMove || onTags || onShare || onDelete) && (
+        {(onRename || onMove || onTags || onShare || onArchive || onDelete) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
@@ -79,6 +80,12 @@ const NoteCard = ({ note, query, onClick, onRename, onMove, onTags, onShare, onT
                 <DropdownMenuItem onClick={onShare}>
                   <Share2 className="mr-2 h-4 w-4" />
                   Share...
+                </DropdownMenuItem>
+              )}
+              {onArchive && (
+                <DropdownMenuItem onClick={onArchive}>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive
                 </DropdownMenuItem>
               )}
               {onDelete && (
