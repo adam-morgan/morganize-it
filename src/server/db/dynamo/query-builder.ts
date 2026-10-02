@@ -43,8 +43,9 @@ const buildFilterExpression = (ctx: ExpressionContext, criteria: Criteria): stri
     const nameKey = nameRef(ctx, property);
 
     if (value === null) {
-      // Null means the attribute should not exist (or be null)
-      parts.push(`attribute_not_exists(${nameKey})`);
+      const placeholder = nextPlaceholder(ctx);
+      ctx.values[placeholder] = "NULL";
+      parts.push(`(attribute_not_exists(${nameKey}) OR attribute_type(${nameKey}, ${placeholder}))`);
     } else if (typeof value !== "object") {
       // Simple equality
       const placeholder = nextPlaceholder(ctx);
@@ -137,6 +138,51 @@ type IndexMatch = {
   sortKey?: string;
 };
 
+const isCompound = (criteria: Criteria): boolean =>
+  "$and" in criteria || "$or" in criteria || "$not" in criteria;
+
+const flattenAnd = (criteria?: Criteria): Criteria | undefined => {
+  if (!criteria || !("$and" in criteria)) return criteria;
+
+  const merged: FilterCriteria = {};
+
+  for (const part of (criteria as AndCriteria).$and as Criteria[]) {
+    const flat = flattenAnd(part);
+
+    if (!flat || isCompound(flat)) return criteria;
+
+    for (const key of Object.keys(flat)) {
+      if (key in merged) return criteria;
+
+      merged[key] = (flat as FilterCriteria)[key];
+    }
+  }
+
+  return merged;
+};
+
+const SORT_KEY_OPERATORS: Record<string, string> = {
+  $eq: "=",
+  $lt: "<",
+  $lte: "<=",
+  $gt: ">",
+  $gte: ">=",
+};
+
+const canUseSortKey = (criteria: FilterCriteria, sortKey?: string): boolean => {
+  if (!sortKey || criteria[sortKey] === undefined) return true;
+
+  const value = criteria[sortKey];
+
+  if (value === null) return false;
+
+  if (typeof value !== "object") return true;
+
+  const operators = Object.keys(value);
+
+  return operators.length === 1 && operators[0] in SORT_KEY_OPERATORS;
+};
+
 /**
  * Find the best matching index for the given criteria.
  * Returns undefined if no index partition key matches an equality filter.
@@ -145,24 +191,25 @@ const findBestIndex = (
   schema: DynamoTableSchema,
   criteria?: Criteria
 ): IndexMatch | undefined => {
-  if (!criteria) return undefined;
+  if (!criteria || isCompound(criteria)) return undefined;
 
-  // Extract simple equality filters from top-level FilterCriteria
+  const fc = criteria as FilterCriteria;
   const equalityFilters: Record<string, unknown> = {};
-  if (!("$and" in criteria) && !("$or" in criteria) && !("$not" in criteria)) {
-    const fc = criteria as FilterCriteria;
-    for (const key of Object.keys(fc)) {
-      const val = fc[key];
-      if (val === null || typeof val !== "object") {
-        equalityFilters[key] = val;
-      } else if ("$eq" in (val as FilterOperator)) {
-        equalityFilters[key] = (val as FilterOperator).$eq;
-      }
+
+  for (const key of Object.keys(fc)) {
+    const val = fc[key];
+
+    if (val !== null && typeof val !== "object") {
+      equalityFilters[key] = val;
+    } else if (val !== null && "$eq" in (val as FilterOperator)) {
+      equalityFilters[key] = (val as FilterOperator).$eq;
     }
   }
 
-  // Check primary key
-  if (equalityFilters[schema.primaryKey.partition] !== undefined) {
+  if (
+    equalityFilters[schema.primaryKey.partition] != null &&
+    canUseSortKey(fc, schema.primaryKey.sort)
+  ) {
     return {
       partitionKey: schema.primaryKey.partition,
       partitionValue: equalityFilters[schema.primaryKey.partition],
@@ -173,7 +220,7 @@ const findBestIndex = (
   // Check GSIs
   if (schema.indexes) {
     for (const [indexName, index] of Object.entries(schema.indexes)) {
-      if (equalityFilters[index.partition] !== undefined) {
+      if (equalityFilters[index.partition] != null && canUseSortKey(fc, index.sort)) {
         return {
           indexName,
           partitionKey: index.partition,
@@ -206,7 +253,8 @@ export const buildDynamoQuery = (
     counter: 0,
   };
 
-  const indexMatch = findBestIndex(schema, findOptions?.criteria);
+  const criteria = flattenAnd(findOptions?.criteria);
+  const indexMatch = findBestIndex(schema, criteria);
   const limit = findOptions?.limit;
 
   if (indexMatch) {
@@ -221,8 +269,8 @@ export const buildDynamoQuery = (
     // attributes appearing in a FilterExpression. Pull it out before building
     // the filter expression for non-key attributes.
     let filterExpression: string | undefined;
-    if (findOptions?.criteria) {
-      const remainingCriteria = { ...findOptions.criteria } as FilterCriteria;
+    if (criteria) {
+      const remainingCriteria = { ...criteria } as FilterCriteria;
       delete remainingCriteria[indexMatch.partitionKey];
 
       if (indexMatch.sortKey && remainingCriteria[indexMatch.sortKey] !== undefined) {
@@ -230,34 +278,13 @@ export const buildDynamoQuery = (
         const sortRef = nameRef(ctx, indexMatch.sortKey);
         const sortPlaceholder = nextPlaceholder(ctx);
 
-        if (sortValue === null || typeof sortValue !== "object") {
+        if (typeof sortValue !== "object") {
           ctx.values[sortPlaceholder] = sortValue;
           keyCondition += ` AND ${sortRef} = ${sortPlaceholder}`;
         } else {
-          const ops = sortValue as FilterOperator;
-          const operatorEntries = Object.entries(ops);
-          // Sort-key conditions can be: =, <, <=, >, >=, BETWEEN, begins_with.
-          // For supported single-operator forms, put it in the KeyConditionExpression.
-          if (operatorEntries.length === 1) {
-            const [op, val] = operatorEntries[0];
-            const sortOpMap: Record<string, string> = {
-              $eq: "=",
-              $lt: "<",
-              $lte: "<=",
-              $gt: ">",
-              $gte: ">=",
-            };
-            if (op in sortOpMap) {
-              ctx.values[sortPlaceholder] = val;
-              keyCondition += ` AND ${sortRef} ${sortOpMap[op]} ${sortPlaceholder}`;
-            } else {
-              // Unsupported in KeyCondition — fall back to leaving in filter
-              // (will likely fail at the DynamoDB level for $in/$nin/$ne).
-              throw new Error(
-                `Operator ${op} cannot be applied to sort key ${indexMatch.sortKey}`
-              );
-            }
-          }
+          const [op, val] = Object.entries(sortValue as FilterOperator)[0];
+          ctx.values[sortPlaceholder] = val;
+          keyCondition += ` AND ${sortRef} ${SORT_KEY_OPERATORS[op]} ${sortPlaceholder}`;
         }
         delete remainingCriteria[indexMatch.sortKey];
       }
@@ -312,8 +339,8 @@ export const buildDynamoQuery = (
   } else {
     // Fall back to ScanCommand
     let filterExpression: string | undefined;
-    if (findOptions?.criteria) {
-      filterExpression = buildFilterExpression(ctx, findOptions.criteria);
+    if (criteria) {
+      filterExpression = buildFilterExpression(ctx, criteria);
     }
 
     let exclusiveStartKey: Record<string, unknown> | undefined;

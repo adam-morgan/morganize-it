@@ -175,7 +175,7 @@ api.route("PATCH /notebooks/{id}", {
 
 api.route("DELETE /notebooks/{id}", {
   handler: `${handlerBase}/notebooks/delete.handler`,
-  link: notebookLinks,
+  link: [...notebookLinks, notesTable],
   environment: defaultEnv,
   nodejs,
 });

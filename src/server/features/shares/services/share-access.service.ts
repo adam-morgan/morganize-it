@@ -48,8 +48,9 @@ const max = (a: ShareAccessLevel, b: ShareAccessLevel): ShareAccessLevel =>
 class DefaultShareAccessService implements ShareAccessService {
   getNotebookAccess(userId: string, notebookId: string): Observable<ShareAccessLevel> {
     return getNotebookService()
-      .findById(notebookId)
+      .find({ criteria: { id: notebookId }, includeSoftDeleted: true })
       .pipe(
+        map((result) => result.items[0]),
         catchError(() => of(undefined)),
         switchMap((notebook) => {
           if (notebook && notebook.userId === userId) return of("owner" as ShareAccessLevel);
@@ -68,8 +69,9 @@ class DefaultShareAccessService implements ShareAccessService {
     notebookId?: string
   ): Observable<ShareAccessLevel> {
     return getNoteService()
-      .findById(noteId)
+      .find({ criteria: { id: noteId }, includeSoftDeleted: true })
       .pipe(
+        map((result) => result.items[0]),
         catchError(() => of(undefined)),
         switchMap((note) => {
           // Owner of the note always wins.

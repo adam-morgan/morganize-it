@@ -48,10 +48,15 @@ export const sync = (
     ownedNotes: getNoteService()
       .find(findOptions, me)
       .pipe(map((r) => r.items)),
+    allOwnedNotebooks: getNotebookService()
+      .find({}, me)
+      .pipe(map((r) => r.items)),
     notebookShares: getShareService().findSharedWith(me, "notebook"),
     noteShares: getShareService().findSharedWith(me, "note"),
   }).pipe(
-    switchMap(({ ownedNotebooks, ownedNotes, notebookShares, noteShares }) => {
+    switchMap(({ ownedNotebooks, ownedNotes, allOwnedNotebooks, notebookShares, noteShares }) => {
+      const ownedNotebookIds = new Set(allOwnedNotebooks.map((nb) => nb.id));
+
       // Hydrate shared notebooks
       const sharedNotebooks$: Observable<SyncNotebook[]> =
         notebookShares.length === 0
@@ -117,11 +122,61 @@ export const sync = (
               map((items) => items.filter((i): i is SyncNote => i != null))
             );
 
+      const collaboratorNotes$: Observable<SyncNote[]> =
+        allOwnedNotebooks.length === 0
+          ? of([])
+          : forkJoin(
+              allOwnedNotebooks.map((nb) =>
+                getNoteService()
+                  .find({ criteria: { notebookId: nb.id } })
+                  .pipe(
+                    map((r) => r.items.filter((note) => note.userId !== me)),
+                    catchError(() => of([] as Note[]))
+                  )
+              )
+            ).pipe(
+              map((groups) => groups.flat()),
+              switchMap((notes) => {
+                const authorIds = Array.from(new Set(notes.map((n) => n.userId)));
+
+                if (authorIds.length === 0) return of([] as SyncNote[]);
+
+                return forkJoin(
+                  authorIds.map((id) =>
+                    defer(() => getAuthService().getUser(id, false)).pipe(
+                      catchError(() => of(undefined))
+                    )
+                  )
+                ).pipe(
+                  map((authors) => {
+                    const authorById = new Map(
+                      authors.filter((a) => a != null).map((a) => [a.id, a])
+                    );
+                    const notebookNameById = new Map(
+                      allOwnedNotebooks.map((nb) => [nb.id, nb.name])
+                    );
+
+                    return notes.map(
+                      (note) =>
+                        ({
+                          ...note,
+                          accessLevel: "readwrite",
+                          ownerName: authorById.get(note.userId)?.name,
+                          ownerEmail: authorById.get(note.userId)?.email,
+                          parentNotebookName: notebookNameById.get(note.notebookId),
+                        }) as SyncNote
+                    );
+                  })
+                );
+              })
+            );
+
       return forkJoin({
         sharedNotebooks: sharedNotebooks$,
         sharedNotes: sharedNotes$,
+        collaboratorNotes: collaboratorNotes$,
       }).pipe(
-        switchMap(({ sharedNotebooks, sharedNotes }) => {
+        switchMap(({ sharedNotebooks, sharedNotes, collaboratorNotes }) => {
           // Get notes from shared notebooks
           const sharedNbNotes$: Observable<SyncNote[]> =
             sharedNotebooks.length === 0
@@ -166,7 +221,11 @@ export const sync = (
               }
               // Shadow notebooks for individually shared notes
               for (const note of sharedNotes) {
-                if (!notebookMap.has(note.notebookId) && note.parentNotebookName) {
+                if (
+                  !notebookMap.has(note.notebookId) &&
+                  !ownedNotebookIds.has(note.notebookId) &&
+                  note.parentNotebookName
+                ) {
                   notebookMap.set(note.notebookId, {
                     id: note.notebookId,
                     userId: note.userId,
@@ -184,7 +243,7 @@ export const sync = (
               for (const note of ownedNotes) {
                 noteMap.set(note.id, { ...note, accessLevel: "owner" });
               }
-              for (const note of sharedNbNotes) {
+              for (const note of [...collaboratorNotes, ...sharedNbNotes]) {
                 const existing = noteMap.get(note.id);
                 if (
                   !existing ||

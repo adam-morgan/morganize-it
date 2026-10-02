@@ -9,26 +9,42 @@ export class NotePermissionResolver implements PermissionResolver<Note> {
     // Created note must belong to the requesting user. They must also have
     // notebook-level access (owner or readwrite) to add notes to that notebook.
     if (entity.userId !== userId) return of(false);
-    return getShareAccessService()
-      .getNotebookAccess(userId, entity.notebookId)
-      .pipe(map((level) => level === "owner" || level === "readwrite"));
+
+    const idAvailable$ = entity.id
+      ? getNoteService()
+          .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
+          .pipe(map((result) => result.items.length === 0))
+      : of(true);
+
+    return idAvailable$.pipe(
+      switchMap((available) =>
+        available
+          ? getShareAccessService()
+              .getNotebookAccess(userId, entity.notebookId)
+              .pipe(map((level) => level === "owner" || level === "readwrite"))
+          : of(false)
+      )
+    );
   }
 
   canUpdate(userId: string, entity: Note): Observable<boolean> {
     return getNoteService()
-      .find({ criteria: { id: entity.id } })
+      .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
       .pipe(
         switchMap((result) => {
           if (result.items.length === 0) {
             return throwError(() => new NotFoundError("Record not found"));
           }
           const existing = result.items[0];
+
+          if (entity.userId && entity.userId !== existing.userId) return of(false);
+
           const isMove = entity.notebookId && entity.notebookId !== existing.notebookId;
           return getShareAccessService()
             .getNoteAccess(userId, entity.id, existing.notebookId)
             .pipe(
               map((level) => {
-                if (isMove) return level === "owner";
+                if (isMove || existing.deletedAt) return level === "owner";
                 return level === "owner" || level === "readwrite";
               })
             );

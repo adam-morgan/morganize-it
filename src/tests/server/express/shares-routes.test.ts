@@ -399,4 +399,146 @@ describe("Express - Shares & Shared Resources", () => {
       expect(res.status).toBe(204);
     });
   });
+
+  describe("Ownership and trash", () => {
+    const shareNotebook = (permission: SharePermission) =>
+      request(app)
+        .post("/api/shares")
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ resourceType: "notebook", resourceId: notebookId, sharedWithUserId: bobId, permission });
+
+    it("readwrite recipient cannot take ownership of the notebook", async () => {
+      await shareNotebook("readwrite");
+
+      const res = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ userId: bobId });
+
+      expect(res.status).toBe(403);
+
+      const notebook = await getKnex()("notebooks").where({ id: notebookId }).first();
+
+      expect(notebook.userId).toBe(aliceId);
+    });
+
+    it("readwrite recipient cannot take ownership of a note", async () => {
+      await shareNotebook("readwrite");
+
+      const res = await request(app)
+        .patch(`/api/notes/${noteId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ userId: bobId });
+
+      expect(res.status).toBe(403);
+    });
+
+    it("cannot create a notebook that reuses an existing id", async () => {
+      const res = await request(app)
+        .post("/api/notebooks")
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ id: notebookId, name: "Copy", userId: bobId });
+
+      expect(res.status).toBe(403);
+    });
+
+    it("owner can restore a trashed notebook and then share it", async () => {
+      const deleted = await request(app)
+        .delete(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`);
+
+      expect(deleted.status).toBe(204);
+
+      const restored = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ deletedAt: null });
+
+      expect(restored.status).toBe(200);
+
+      const shared = await shareNotebook("read");
+
+      expect(shared.status).toBe(201);
+    });
+
+    it("readwrite recipient cannot restore the owner's trashed notebook", async () => {
+      await shareNotebook("readwrite");
+
+      await request(app)
+        .delete(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${aliceToken}`);
+
+      const res = await request(app)
+        .patch(`/api/notebooks/${notebookId}`)
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ deletedAt: null });
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe("POST /api/sync", () => {
+    const createBobNote = async () => {
+      const now = new Date().toISOString();
+
+      const res = await request(app)
+        .post("/api/notes")
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({
+          title: "Bob's note",
+          content: "",
+          textContent: "",
+          notebookId,
+          userId: bobId,
+          createdAt: now,
+          updatedAt: now,
+          lastOpenedAt: now,
+        });
+
+      expect(res.status).toBe(201);
+
+      return res.body as Note;
+    };
+
+    beforeEach(async () => {
+      await request(app)
+        .post("/api/shares")
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ resourceType: "notebook", resourceId: notebookId, sharedWithUserId: bobId, permission: "readwrite" });
+    });
+
+    it("includes notes collaborators added to the owner's notebook", async () => {
+      const bobNote = await createBobNote();
+
+      const res = await request(app).post("/api/sync").set("Authorization", `Bearer ${aliceToken}`).send({});
+
+      expect(res.status).toBe(200);
+
+      const synced = (res.body as SyncResponse).notes.find((n) => n.id === bobNote.id);
+
+      expect(synced?.accessLevel).toBe("readwrite");
+      expect(synced?.parentNotebookName).toBe("Alice's Notebook");
+    });
+
+    it("does not replace the owner's notebook with a shadow on incremental sync", async () => {
+      const bobNote = await createBobNote();
+
+      const shared = await request(app)
+        .post("/api/shares")
+        .set("Authorization", `Bearer ${bobToken}`)
+        .send({ resourceType: "note", resourceId: bobNote.id, sharedWithUserId: aliceId, permission: "read" });
+
+      expect(shared.status).toBe(201);
+
+      const lastSync = new Date(Date.now() + 60_000).toISOString();
+
+      const res = await request(app)
+        .post("/api/sync")
+        .set("Authorization", `Bearer ${aliceToken}`)
+        .send({ lastSync });
+
+      expect(res.status).toBe(200);
+      expect((res.body as SyncResponse).notebooks.find((nb) => nb.id === notebookId)).toBeUndefined();
+    });
+  });
 });

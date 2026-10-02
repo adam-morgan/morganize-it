@@ -18,13 +18,13 @@ export class CachedNotesService implements NotesService {
 
   createNotebook(name: string): Observable<Notebook> {
     return this.api.createNotebook(name).pipe(
-      tap((nb) => this.writeToCache("notebooks", nb))
+      tap((nb) => this.writeToCache("notebooks", { ...nb, accessLevel: "owner" }))
     );
   }
 
   updateNotebook(id: string, name: string): Observable<Notebook> {
     return this.api.updateNotebook(id, name).pipe(
-      tap((nb) => this.writeToCache("notebooks", nb))
+      tap((nb) => this.mergeIntoCache("notebooks", nb))
     );
   }
 
@@ -56,13 +56,13 @@ export class CachedNotesService implements NotesService {
 
   createNote(note: Omit<Note, "id">): Observable<Note> {
     return this.api.createNote(note).pipe(
-      tap((n) => this.writeToCache("notes", n))
+      tap((n) => this.writeToCache("notes", { ...n, accessLevel: "owner" }))
     );
   }
 
   updateNote(id: string, data: Partial<Note>): Observable<Note> {
     return this.api.updateNote(id, data).pipe(
-      tap((n) => this.writeToCache("notes", n))
+      tap((n) => this.mergeIntoCache("notes", n))
     );
   }
 
@@ -72,8 +72,16 @@ export class CachedNotesService implements NotesService {
     );
   }
 
-  private writeToCache(store: "notebooks" | "notes", item: Notebook | Note): void {
+  private writeToCache(store: "notebooks" | "notes", item: SyncNotebook | SyncNote): void {
     getCacheDb(this.userId).then((db) => db.put(store, item));
+  }
+
+  private mergeIntoCache(store: "notebooks" | "notes", item: Notebook | Note): void {
+    getCacheDb(this.userId).then(async (db) => {
+      const existing = await db.get(store, item.id);
+
+      await db.put(store, { ...existing, ...item });
+    });
   }
 
   private deleteFromCache(store: "notebooks" | "notes", id: string): void {

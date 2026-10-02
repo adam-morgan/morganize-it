@@ -6,21 +6,36 @@ import { getNotebookService } from "../services";
 
 export class NotebookPermissionResolver implements PermissionResolver<Notebook> {
   canCreate(userId: string, entity: Notebook): Observable<boolean> {
-    // Creators can only create their own notebooks.
-    return of(entity.userId === userId);
+    if (entity.userId !== userId) return of(false);
+
+    if (!entity.id) return of(true);
+
+    return getNotebookService()
+      .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
+      .pipe(map((result) => result.items.length === 0));
   }
 
   canUpdate(userId: string, entity: Notebook): Observable<boolean> {
     return getNotebookService()
-      .find({ criteria: { id: entity.id } })
+      .find({ criteria: { id: entity.id }, includeSoftDeleted: true })
       .pipe(
-        switchMap((result) =>
-          result.items.length === 0
-            ? throwError(() => new NotFoundError("Record not found"))
-            : getShareAccessService()
-                .getNotebookAccess(userId, entity.id)
-                .pipe(map((level) => level === "owner" || level === "readwrite"))
-        )
+        switchMap((result) => {
+          if (result.items.length === 0) {
+            return throwError(() => new NotFoundError("Record not found"));
+          }
+
+          const existing = result.items[0];
+
+          if (entity.userId && entity.userId !== existing.userId) return of(false);
+
+          return getShareAccessService()
+            .getNotebookAccess(userId, entity.id)
+            .pipe(
+              map((level) =>
+                existing.deletedAt ? level === "owner" : level === "owner" || level === "readwrite"
+              )
+            );
+        })
       );
   }
 

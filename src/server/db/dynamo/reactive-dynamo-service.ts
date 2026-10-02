@@ -1,10 +1,22 @@
-import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DeleteCommand,
+  PutCommand,
+  QueryCommand,
+  QueryCommandOutput,
+  ScanCommand,
+  ScanCommandOutput,
+} from "@aws-sdk/lib-dynamodb";
 import { from, Observable } from "rxjs";
 import { AbstractReactiveService, TableID } from "../reactive-service";
 import { NotFoundError } from "@/server/errors";
 import { getDocClient } from "./client";
 import { buildDynamoQuery, encodeDynamoCursor } from "./query-builder";
 import { DynamoTableSchema } from "./tables";
+
+const withoutNulls = <T>(data: T): T =>
+  Object.fromEntries(
+    Object.entries(data as Record<string, unknown>).filter(([, value]) => value !== null)
+  ) as T;
 
 export class ReactiveDynamoService<T extends Entity> extends AbstractReactiveService<T> {
   constructor(
@@ -23,46 +35,70 @@ export class ReactiveDynamoService<T extends Entity> extends AbstractReactiveSer
     );
 
     return from(
-      getDocClient()
-        .send(command)
-        .then((result) => {
-          let items = (result.Items ?? []) as T[];
+      this.send(command, limit == null).then((result) => {
+        let items = (result.Items ?? []) as T[];
 
-          // Apply client-side sort if DynamoDB couldn't sort natively
-          if (clientSideSort && clientSideSort.length > 0) {
-            items = this.sortItems(items, clientSideSort);
-          }
+        // Apply client-side sort if DynamoDB couldn't sort natively
+        if (clientSideSort && clientSideSort.length > 0) {
+          items = this.sortItems(items, clientSideSort);
+        }
 
-          // Apply limit if client-side sorting changed the order
-          if (clientSideSort && limit && items.length > limit) {
-            items = items.slice(0, limit);
-          }
+        // Apply limit if client-side sorting changed the order
+        if (clientSideSort && limit && items.length > limit) {
+          items = items.slice(0, limit);
+        }
 
-          const pageResult: PageResult<T> = { items };
+        const pageResult: PageResult<T> = { items };
 
-          if (result.LastEvaluatedKey) {
-            pageResult.nextCursor = encodeDynamoCursor(result.LastEvaluatedKey);
-          }
+        if (result.LastEvaluatedKey) {
+          pageResult.nextCursor = encodeDynamoCursor(result.LastEvaluatedKey);
+        }
 
-          return pageResult;
-        })
+        return pageResult;
+      })
     );
   }
 
+  private async send(
+    command: QueryCommand | ScanCommand,
+    allPages: boolean
+  ): Promise<QueryCommandOutput | ScanCommandOutput> {
+    const client = getDocClient();
+    const first = await client.send(command as QueryCommand);
+
+    if (!allPages) return first;
+
+    const items = [...(first.Items ?? [])];
+    let lastKey = first.LastEvaluatedKey;
+
+    while (lastKey) {
+      command.input.ExclusiveStartKey = lastKey;
+
+      const page = await client.send(command as QueryCommand);
+
+      items.push(...(page.Items ?? []));
+      lastKey = page.LastEvaluatedKey;
+    }
+
+    return { ...first, Items: items, LastEvaluatedKey: undefined };
+  }
+
   create(data: T): Observable<T> {
+    const item = withoutNulls(data);
+
     const command = new PutCommand({
       TableName: this.tableName,
-      Item: data as Record<string, unknown>,
+      Item: item as Record<string, unknown>,
       ConditionExpression: `attribute_not_exists(${this.idProperty})`,
     });
 
     return from(
       getDocClient()
         .send(command)
-        .then(() => data)
+        .then(() => item)
         .catch((err) => {
           if (err.name === "ConditionalCheckFailedException") {
-            throw new Error(`Item with ${this.idProperty} "${(data as Record<string, unknown>)[this.idProperty]}" already exists`);
+            throw new Error(`Item with ${this.idProperty} "${(item as Record<string, unknown>)[this.idProperty]}" already exists`);
           }
           throw err;
         })
@@ -70,16 +106,18 @@ export class ReactiveDynamoService<T extends Entity> extends AbstractReactiveSer
   }
 
   update(id: TableID, data: T): Observable<T> {
+    const item = withoutNulls(data);
+
     const command = new PutCommand({
       TableName: this.tableName,
-      Item: { ...data, [this.idProperty]: id } as Record<string, unknown>,
+      Item: { ...item, [this.idProperty]: id } as Record<string, unknown>,
       ConditionExpression: `attribute_exists(${this.idProperty})`,
     });
 
     return from(
       getDocClient()
         .send(command)
-        .then(() => ({ ...data, [this.idProperty]: id }))
+        .then(() => ({ ...item, [this.idProperty]: id }))
         .catch((err) => {
           if (err.name === "ConditionalCheckFailedException") {
             throw new NotFoundError("Record not found");
